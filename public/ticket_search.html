@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>回数券フォローアップ検索</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f5f5f5;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-spinner {
+      animation: spin 1s linear infinite;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function TicketSearchApp() {
+      const [isLoading, setIsLoading] = useState(false); // 初期状態をfalseに変更
+      const [allDataByDate, setAllDataByDate] = useState({});
+      const [customerDb, setCustomerDb] = useState({});
+      const [targetCustomers, setTargetCustomers] = useState([]);
+      const [filterConditions, setFilterConditions] = useState({
+        maxRemaining: 3,
+        remainingEnabled: false, // デフォルトOFF
+        periodType: 'within',
+        periodDays: 30,
+        periodEnabled: false, // デフォルトOFF
+        visitedRangeStart: '',
+        visitedRangeEnd: '',
+        visitedRangeEnabled: false,
+        notVisitedRangeStart: '',
+        notVisitedRangeEnd: '',
+        notVisitedRangeEnabled: false,
+        ticketOwnership: 'hasTicket',
+        ticketOwnershipEnabled: false, // デフォルトOFF
+        reviewFilter: 'all',
+        reviewEnabled: false
+      });
+
+      // データをlocalStorageから読み込み
+      useEffect(() => {
+        try {
+          const storedData = localStorage.getItem('allDataByDate');
+          const storedCustomerDb = localStorage.getItem('customerDb');
+          
+          if (storedData) {
+            setAllDataByDate(JSON.parse(storedData));
+          }
+          if (storedCustomerDb) {
+            setCustomerDb(JSON.parse(storedCustomerDb));
+          }
+        } catch (error) {
+          console.error('データ読み込みエラー:', error);
+          alert('データの読み込みに失敗しました');
+        }
+      }, []);
+
+      // 初期状態では空のリスト
+      // useEffectによる自動フィルタリングは無効化（検索ボタン押下時のみ実行）
+
+      // 検索ボタン押下時のハンドラー
+      const handleSearch = () => {
+        setIsLoading(true);
+        
+        setTimeout(() => {
+          try {
+            const results = performFiltering();
+            setTargetCustomers(results);
+          } catch (error) {
+            console.error('フィルタリングエラー:', error);
+            setTargetCustomers([]);
+          } finally {
+            setIsLoading(false);
+          }
+        }, 100);
+      };
+
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`; // YYYY-MM-DD形式に変更（allDataByDateのキー形式に合わせる）
+      };
+
+      const performFiltering = () => {
+        const {
+          maxRemaining, remainingEnabled,
+          periodType, periodDays, periodEnabled,
+          visitedRangeStart, visitedRangeEnd, visitedRangeEnabled,
+          notVisitedRangeStart, notVisitedRangeEnd, notVisitedRangeEnabled,
+          ticketOwnership, ticketOwnershipEnabled, reviewFilter, reviewEnabled
+        } = filterConditions;
+
+        // 基準日を計算
+        const referenceDate = new Date();
+        referenceDate.setDate(referenceDate.getDate() - periodDays);
+        const referenceDateStr = formatDate(referenceDate);
+
+        console.log('🔍 フィルタリング開始');
+        console.log('📅 基準日:', referenceDateStr, `(今日から${periodDays}日前)`);
+        console.log('📊 全顧客数:', Object.keys(customerDb).length);
+        console.log('📊 予約データ件数:', Object.keys(allDataByDate).length);
+
+        // 予約データから顧客IDと来院日のマップを作成
+        const customerVisitsMap = {};
+
+        Object.entries(allDataByDate).forEach(([date, dateData]) => {
+          if (date === 'customer-db' || date === '2025' || date.length === 4) return;
+          const data = dateData?.data || {};
+
+          Object.entries(data).forEach(([key, value]) => {
+            if (key.endsWith('-id') && value) {
+              const customerId = typeof value === 'object' ? value.id : value;
+              if (customerId) {
+                if (!customerVisitsMap[customerId]) {
+                  customerVisitsMap[customerId] = new Set();
+                }
+                customerVisitsMap[customerId].add(date);
+              }
+            }
+          });
+        });
+
+        console.log('👥 来院データがある顧客数:', Object.keys(customerVisitsMap).length);
+        if (Object.keys(customerVisitsMap).length > 0) {
+          const sampleId = Object.keys(customerVisitsMap)[0];
+          const sampleDates = Array.from(customerVisitsMap[sampleId]);
+          console.log('📋 サンプル顧客の来院日:', sampleId, sampleDates);
+        }
+
+        const allCustomerIds = new Set([
+          ...Object.keys(customerDb),
+          ...Object.keys(customerVisitsMap)
+        ]);
+
+        // システム枠を除外（数字のみのIDや特定の名前）
+        const excludeSystemIds = (id) => {
+          const customer = customerDb[id] || {};
+          const name = customer.name || '';
+          
+          // 数字のみのID（1, 2, 3など）を除外
+          if (/^\d+$/.test(id) && parseInt(id) < 100) {
+            return false;
+          }
+          
+          // システム用の名前を除外
+          const systemNames = ['楽トレ', '新患', '美容', '枠', 'キャンセル'];
+          if (systemNames.some(keyword => name.includes(keyword))) {
+            return false;
+          }
+          
+          return true;
+        };
+
+        console.log('👥 システム枠除外前:', allCustomerIds.size);
+        const filteredIds = Array.from(allCustomerIds).filter(excludeSystemIds);
+        console.log('👥 システム枠除外後:', filteredIds.length);
+
+        // フィルタリング
+        const results = filteredIds
+          .filter((id) => {
+            const customer = customerDb[id] || {};
+            const tickets = Array.isArray(customer.tickets) ? customer.tickets : [];
+            const hasTickets = tickets.length > 0;
+
+            // 回数券の有無でフィルタリング（有効な場合のみ）
+            if (ticketOwnershipEnabled) {
+              if (ticketOwnership === 'hasTicket' && !hasTickets) return false;
+              if (ticketOwnership === 'noTicket' && hasTickets) return false;
+            }
+
+            // 口コミフィルター
+            if (reviewEnabled && reviewFilter !== 'all') {
+              let hasReviewYes = false;
+              let hasReviewNo = false;
+
+              Object.entries(allDataByDate).forEach(([date, dateData]) => {
+                if (date === 'customer-db' || date === '2025' || date.length === 4) return;
+                const data = dateData?.data || {};
+                const reviewData = dateData?.reviewData || {};
+
+                Object.entries(data).forEach(([key, value]) => {
+                  if (key.endsWith('-id') && value) {
+                    const customerId = typeof value === 'object' ? value.id : value;
+                    if (customerId === id) {
+                      const timeCol = key.replace('-id', '');
+                      const reviewKey = timeCol;
+                      const review = reviewData[reviewKey];
+                      if (review?.status === 'yes') hasReviewYes = true;
+                      if (review?.status === 'no') hasReviewNo = true;
+                    }
+                  }
+                });
+              });
+
+              if (reviewFilter === 'yes' && !hasReviewYes) return false;
+              if (reviewFilter === 'no' && !hasReviewNo && !hasReviewYes) return false;
+            }
+
+            const visitDatesSet = customerVisitsMap[id] || new Set();
+            const visitDates = Array.from(visitDatesSet).sort();
+
+            // デバッグ: 最初の5人だけログ出力
+            if (filteredIds.indexOf(id) < 5) {
+              console.log(`👤 顧客 ${id} (${customer.name || '名前なし'}):`, {
+                hasTickets,
+                visitDates,
+                lastVisit: visitDates.length > 0 ? visitDates[visitDates.length - 1] : 'なし',
+                referenceDateStr
+              });
+            }
+
+            // すべてのフィルターが無効の場合は全顧客を表示
+            if (!remainingEnabled && !periodEnabled && !visitedRangeEnabled && !notVisitedRangeEnabled) {
+              return true;
+            }
+
+            // 回数券がない場合は予約データから判定
+            if (!hasTickets) {
+              if (visitDates.length === 0) {
+                if (periodEnabled || visitedRangeEnabled || notVisitedRangeEnabled) return false;
+                return true;
+              }
+
+              const lastVisit = visitDates[visitDates.length - 1];
+
+              // 日数フィルター
+              if (periodEnabled) {
+                if (periodType === 'within') {
+                  if (lastVisit < referenceDateStr) return false;
+                } else {
+                  if (lastVisit >= referenceDateStr) return false;
+                }
+              }
+
+              // 来院した期間フィルター
+              if (visitedRangeEnabled && visitedRangeStart && visitedRangeEnd) {
+                const hasVisitInRange = visitDates.some(v => v >= visitedRangeStart && v <= visitedRangeEnd);
+                if (!hasVisitInRange) return false;
+              }
+
+              // 来院していない期間フィルター
+              if (notVisitedRangeEnabled && notVisitedRangeStart && notVisitedRangeEnd) {
+                const hasVisitInRange = visitDates.some(v => v >= notVisitedRangeStart && v <= notVisitedRangeEnd);
+                if (hasVisitInRange) return false;
+              }
+
+              return true;
+            }
+
+            // 回数券持ちの場合
+            return tickets.some(ticket => {
+              const used = ticket.used || [];
+              const remaining = ticket.count - used.length;
+
+              if (remainingEnabled) {
+                if (remaining > maxRemaining) return false;
+              }
+
+              if (!periodEnabled && !visitedRangeEnabled && !notVisitedRangeEnabled) {
+                return true;
+              }
+
+              if (visitDates.length === 0) {
+                return false;
+              }
+
+              const lastVisit = visitDates[visitDates.length - 1];
+
+              if (periodEnabled) {
+                if (periodType === 'within') {
+                  if (lastVisit < referenceDateStr) return false;
+                } else {
+                  if (lastVisit >= referenceDateStr) return false;
+                }
+              }
+
+              if (visitedRangeEnabled && visitedRangeStart && visitedRangeEnd) {
+                const hasVisitInRange = visitDates.some(v => v >= visitedRangeStart && v <= visitedRangeEnd);
+                if (!hasVisitInRange) return false;
+              }
+
+              if (notVisitedRangeEnabled && notVisitedRangeStart && notVisitedRangeEnd) {
+                const hasVisitInRange = visitDates.some(v => v >= notVisitedRangeStart && v <= notVisitedRangeEnd);
+                if (hasVisitInRange) return false;
+              }
+
+              return true;
+            });
+          })
+          .map((id) => {
+            const customer = customerDb[id] || {};
+            const tickets = Array.isArray(customer.tickets) ? customer.tickets : [];
+            const visitDatesSet = customerVisitsMap[id] || new Set();
+            const visitDates = Array.from(visitDatesSet).sort();
+
+            // 口コミ情報を取得
+            let hasReviewYes = false;
+            let hasReviewNo = false;
+            Object.entries(allDataByDate).forEach(([date, dateData]) => {
+              if (date === 'customer-db' || date === '2025' || date.length === 4) return;
+              const data = dateData?.data || {};
+              const reviewData = dateData?.reviewData || {};
+
+              Object.entries(data).forEach(([key, value]) => {
+                if (key.endsWith('-id') && value) {
+                  const cid = typeof value === 'object' ? value.id : value;
+                  if (cid === id) {
+                    const timeCol = key.replace('-id', '');
+                    const review = reviewData[timeCol];
+                    if (review?.status === 'yes') hasReviewYes = true;
+                    if (review?.status === 'no') hasReviewNo = true;
+                  }
+                }
+              });
+            });
+
+            const reviewStatus = hasReviewYes ? '○' : (hasReviewNo ? '×' : '-');
+
+            if (tickets.length === 0) {
+              return {
+                id,
+                name: customer.name || id,
+                furigana: customer.furigana || '',
+                staff: customer.staff || '',
+                review: reviewStatus,
+                tickets: [{
+                  ticketName: '回数券なし',
+                  ticketNumber: '-',
+                  remaining: '-',
+                  lastUsed: visitDates.length > 0 ? visitDates[visitDates.length - 1] : '来院なし'
+                }]
+              };
+            }
+
+            const validTickets = tickets
+              .map((ticket, idx) => {
+                const used = ticket.used || [];
+                const remaining = ticket.count - used.length;
+
+                if (remainingEnabled && remaining > maxRemaining) return null;
+
+                if (!periodEnabled && !visitedRangeEnabled && !notVisitedRangeEnabled) {
+                  const lastVisit = visitDates.length > 0 ? visitDates[visitDates.length - 1] : '来院なし';
+                  return {
+                    ticketName: `${ticket.name} ${ticket.count}回`,
+                    ticketNumber: idx + 1,
+                    remaining,
+                    lastUsed: lastVisit
+                  };
+                }
+
+                if (visitDates.length === 0) return null;
+
+                const lastVisit = visitDates[visitDates.length - 1];
+
+                if (periodEnabled) {
+                  const meetsDateCondition = periodType === 'within'
+                    ? lastVisit >= referenceDateStr
+                    : lastVisit < referenceDateStr;
+                  if (!meetsDateCondition) return null;
+                }
+
+                if (visitedRangeEnabled && visitedRangeStart && visitedRangeEnd) {
+                  const hasVisitInRange = visitDates.some(v => v >= visitedRangeStart && v <= visitedRangeEnd);
+                  if (!hasVisitInRange) return null;
+                }
+
+                if (notVisitedRangeEnabled && notVisitedRangeStart && notVisitedRangeEnd) {
+                  const hasVisitInRange = visitDates.some(v => v >= notVisitedRangeStart && v <= notVisitedRangeEnd);
+                  if (hasVisitInRange) return null;
+                }
+
+                return {
+                  ticketName: `${ticket.name} ${ticket.count}回`,
+                  ticketNumber: idx + 1,
+                  remaining,
+                  lastUsed: lastVisit
+                };
+              })
+              .filter(t => t !== null);
+
+            if (validTickets.length === 0) return null;
+
+            return {
+              id,
+              name: customer.name || id,
+              furigana: customer.furigana || '',
+              staff: customer.staff || '',
+              review: reviewStatus,
+              tickets: validTickets
+            };
+          })
+          .filter(c => c !== null);
+
+        console.log('✅ フィルタリング完了: ', results.length, '件');
+        
+        return results;
+      };
+
+      const exportCSV = () => {
+        const rows = [
+          ['ID', '名前', 'ふりがな', '担当', '口コミ', '回数券種類', '回数券番号', '残り回数', '最終使用日']
+        ];
+
+        targetCustomers.forEach(customer => {
+          customer.tickets.forEach(ticket => {
+            rows.push([
+              customer.id,
+              customer.name,
+              customer.furigana,
+              customer.staff,
+              customer.review,
+              ticket.ticketName,
+              ticket.ticketNumber,
+              ticket.remaining,
+              ticket.lastUsed
+            ]);
+          });
+        });
+
+        const csvContent = rows.map(row => row.join(',')).join('\n');
+        const bom = '\uFEFF';
+        const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `回数券フォローアップリスト_${formatDate(new Date())}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      return (
+        <div style={{ maxWidth: '100%', margin: 0, padding: 0 }}>
+          {/* フィルター条件 - 極限コンパクト */}
+          <div style={{
+            backgroundColor: 'white',
+            padding: '8px',
+            borderRadius: '0',
+            marginBottom: '0',
+            boxShadow: 'none',
+            border: '1px solid #e0e0e0'
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px', color: '#333', borderBottom: '1px solid #f0f0f0', paddingBottom: '4px' }}>
+              検索条件
+            </div>
+
+            {/* 2カラムレイアウト */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              
+              {/* 左カラム */}
+              <div>
+                {/* 回数券の有無 */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filterConditions.ticketOwnershipEnabled}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, ticketOwnershipEnabled: e.target.checked }))}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: filterConditions.ticketOwnershipEnabled ? '#333' : '#999' }}>
+                      回数券
+                    </span>
+                  </label>
+                  <div style={{ marginLeft: '22px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <input
+                        type="radio"
+                        name="ticketOwnership"
+                        value="all"
+                        checked={filterConditions.ticketOwnership === 'all'}
+                        onChange={(e) => setFilterConditions(prev => ({ ...prev, ticketOwnership: e.target.value }))}
+                        disabled={!filterConditions.ticketOwnershipEnabled}
+                        style={{ cursor: filterConditions.ticketOwnershipEnabled ? 'pointer' : 'not-allowed' }}
+                      />
+                      <span style={{ fontSize: '12px', color: filterConditions.ticketOwnershipEnabled ? '#333' : '#bbb' }}>全員</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <input
+                        type="radio"
+                        name="ticketOwnership"
+                        value="hasTicket"
+                        checked={filterConditions.ticketOwnership === 'hasTicket'}
+                        onChange={(e) => setFilterConditions(prev => ({ ...prev, ticketOwnership: e.target.value }))}
+                        disabled={!filterConditions.ticketOwnershipEnabled}
+                        style={{ cursor: filterConditions.ticketOwnershipEnabled ? 'pointer' : 'not-allowed' }}
+                      />
+                      <span style={{ fontSize: '12px', color: filterConditions.ticketOwnershipEnabled ? '#333' : '#bbb' }}>あり</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <input
+                        type="radio"
+                        name="ticketOwnership"
+                        value="noTicket"
+                        checked={filterConditions.ticketOwnership === 'noTicket'}
+                        onChange={(e) => setFilterConditions(prev => ({ ...prev, ticketOwnership: e.target.value }))}
+                        disabled={!filterConditions.ticketOwnershipEnabled}
+                        style={{ cursor: filterConditions.ticketOwnershipEnabled ? 'pointer' : 'not-allowed' }}
+                      />
+                      <span style={{ fontSize: '12px', color: filterConditions.ticketOwnershipEnabled ? '#333' : '#bbb' }}>なし</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* 残り回数 */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filterConditions.remainingEnabled}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, remainingEnabled: e.target.checked }))}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: filterConditions.remainingEnabled ? '#333' : '#999' }}>
+                      残り回数
+                    </span>
+                  </label>
+                  <div style={{ marginLeft: '22px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={filterConditions.maxRemaining}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, maxRemaining: parseInt(e.target.value) || 3 }))}
+                      disabled={!filterConditions.remainingEnabled}
+                      style={{
+                        width: '50px',
+                        padding: '3px 6px',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        fontSize: '12px',
+                        backgroundColor: filterConditions.remainingEnabled ? 'white' : '#f5f5f5'
+                      }}
+                    />
+                    <span style={{ fontSize: '12px', color: filterConditions.remainingEnabled ? '#333' : '#999' }}>回以下</span>
+                  </div>
+                </div>
+
+                {/* 口コミ */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filterConditions.reviewEnabled}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, reviewEnabled: e.target.checked }))}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: filterConditions.reviewEnabled ? '#333' : '#999' }}>
+                      口コミ
+                    </span>
+                  </label>
+                  <div style={{ marginLeft: '22px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <input
+                        type="radio"
+                        name="reviewFilter"
+                        value="all"
+                        checked={filterConditions.reviewFilter === 'all'}
+                        onChange={(e) => setFilterConditions(prev => ({ ...prev, reviewFilter: e.target.value }))}
+                        disabled={!filterConditions.reviewEnabled}
+                        style={{ cursor: filterConditions.reviewEnabled ? 'pointer' : 'not-allowed' }}
+                      />
+                      <span style={{ fontSize: '12px', color: filterConditions.reviewEnabled ? '#333' : '#bbb' }}>すべて</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <input
+                        type="radio"
+                        name="reviewFilter"
+                        value="yes"
+                        checked={filterConditions.reviewFilter === 'yes'}
+                        onChange={(e) => setFilterConditions(prev => ({ ...prev, reviewFilter: e.target.value }))}
+                        disabled={!filterConditions.reviewEnabled}
+                        style={{ cursor: filterConditions.reviewEnabled ? 'pointer' : 'not-allowed' }}
+                      />
+                      <span style={{ fontSize: '12px', color: filterConditions.reviewEnabled ? '#333' : '#bbb' }}>○のみ</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <input
+                        type="radio"
+                        name="reviewFilter"
+                        value="no"
+                        checked={filterConditions.reviewFilter === 'no'}
+                        onChange={(e) => setFilterConditions(prev => ({ ...prev, reviewFilter: e.target.value }))}
+                        disabled={!filterConditions.reviewEnabled}
+                        style={{ cursor: filterConditions.reviewEnabled ? 'pointer' : 'not-allowed' }}
+                      />
+                      <span style={{ fontSize: '12px', color: filterConditions.reviewEnabled ? '#333' : '#bbb' }}>×のみ</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* 右カラム */}
+              <div>
+                {/* 日数フィルター */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filterConditions.periodEnabled}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, periodEnabled: e.target.checked }))}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: filterConditions.periodEnabled ? '#333' : '#999' }}>
+                      日数
+                    </span>
+                  </label>
+                  <div style={{ marginLeft: '22px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={filterConditions.periodDays}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, periodDays: parseInt(e.target.value) || 30 }))}
+                      disabled={!filterConditions.periodEnabled}
+                      style={{
+                        width: '50px',
+                        padding: '3px 6px',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        fontSize: '12px',
+                        backgroundColor: filterConditions.periodEnabled ? 'white' : '#f5f5f5'
+                      }}
+                    />
+                    <span style={{ fontSize: '12px', color: filterConditions.periodEnabled ? '#333' : '#999' }}>日</span>
+                    <select
+                      value={filterConditions.periodType}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, periodType: e.target.value }))}
+                      disabled={!filterConditions.periodEnabled}
+                      style={{
+                        padding: '3px 6px',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        fontSize: '12px',
+                        backgroundColor: filterConditions.periodEnabled ? 'white' : '#f5f5f5'
+                      }}
+                    >
+                      <option value="within">以内に来院</option>
+                      <option value="outside">以上来院なし</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* 来院期間 */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filterConditions.visitedRangeEnabled}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, visitedRangeEnabled: e.target.checked }))}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: filterConditions.visitedRangeEnabled ? '#333' : '#999' }}>
+                      来院期間
+                    </span>
+                  </label>
+                  <div style={{ marginLeft: '22px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                    <input
+                      type="date"
+                      value={filterConditions.visitedRangeStart}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, visitedRangeStart: e.target.value }))}
+                      disabled={!filterConditions.visitedRangeEnabled}
+                      style={{
+                        padding: '2px 4px',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        fontSize: '11px',
+                        backgroundColor: filterConditions.visitedRangeEnabled ? 'white' : '#f5f5f5'
+                      }}
+                    />
+                    <span style={{ color: filterConditions.visitedRangeEnabled ? '#333' : '#999' }}>〜</span>
+                    <input
+                      type="date"
+                      value={filterConditions.visitedRangeEnd}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, visitedRangeEnd: e.target.value }))}
+                      disabled={!filterConditions.visitedRangeEnabled}
+                      style={{
+                        padding: '2px 4px',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        fontSize: '11px',
+                        backgroundColor: filterConditions.visitedRangeEnabled ? 'white' : '#f5f5f5'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* 未来院期間 */}
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filterConditions.notVisitedRangeEnabled}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, notVisitedRangeEnabled: e.target.checked }))}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: filterConditions.notVisitedRangeEnabled ? '#333' : '#999' }}>
+                      未来院期間
+                    </span>
+                  </label>
+                  <div style={{ marginLeft: '22px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                    <input
+                      type="date"
+                      value={filterConditions.notVisitedRangeStart}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, notVisitedRangeStart: e.target.value }))}
+                      disabled={!filterConditions.notVisitedRangeEnabled}
+                      style={{
+                        padding: '2px 4px',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        fontSize: '11px',
+                        backgroundColor: filterConditions.notVisitedRangeEnabled ? 'white' : '#f5f5f5'
+                      }}
+                    />
+                    <span style={{ color: filterConditions.notVisitedRangeEnabled ? '#333' : '#999' }}>〜</span>
+                    <input
+                      type="date"
+                      value={filterConditions.notVisitedRangeEnd}
+                      onChange={(e) => setFilterConditions(prev => ({ ...prev, notVisitedRangeEnd: e.target.value }))}
+                      disabled={!filterConditions.notVisitedRangeEnabled}
+                      style={{
+                        padding: '2px 4px',
+                        border: '1px solid #ddd',
+                        borderRadius: '3px',
+                        fontSize: '11px',
+                        backgroundColor: filterConditions.notVisitedRangeEnabled ? 'white' : '#f5f5f5'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 検索ボタン - 極限コンパクト */}
+            <button
+              onClick={handleSearch}
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '6px',
+                backgroundColor: isLoading ? '#9E9E9E' : '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '3px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                marginTop: '6px'
+              }}
+            >
+              {isLoading ? '検索中...' : '検索'}
+            </button>
+          </div>
+
+          {/* 検索結果 */}
+          <div style={{
+            backgroundColor: 'white',
+            padding: '6px',
+            borderRadius: '0',
+            boxShadow: 'none',
+            border: '1px solid #e0e0e0',
+            borderTop: 'none'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '0',
+              paddingBottom: '2px',
+              borderBottom: '1px solid #f0f0f0'
+            }}>
+              {isLoading ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '10px',
+                  width: '100%',
+                  fontSize: '12px',
+                  color: '#666'
+                }}>
+                  <div className="loading-spinner" style={{
+                    display: 'inline-block',
+                    fontSize: '18px'
+                  }}>
+                    ⏳
+                  </div>
+                  <div style={{ marginTop: '6px' }}>検索中...</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: '12px', color: '#333', fontWeight: '600' }}>
+                    全{targetCustomers.length}件
+                  </div>
+                  <button
+                    onClick={exportCSV}
+                    disabled={targetCustomers.length === 0}
+                    style={{
+                      padding: '3px 8px',
+                      backgroundColor: targetCustomers.length === 0 ? '#ccc' : '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '2px',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      cursor: targetCustomers.length === 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    CSV出力
+                  </button>
+                </>
+              )}
+            </div>
+
+            {!isLoading && targetCustomers.length > 0 && (
+              <div style={{ maxHeight: '600px', overflowY: 'auto', overflowX: 'auto', marginTop: '0' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '12px',
+                  lineHeight: '1.2'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#FF9800', color: 'white', position: 'sticky', top: 0 }}>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>ID</th>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>名前</th>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>ふりがな</th>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>担当</th>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>口コミ</th>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>回数券</th>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>残り</th>
+                      <th style={{ padding: '2px 4px', border: '1px solid #ddd', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '11px' }}>最終使用日</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {targetCustomers.map((customer, idx) => (
+                      customer.tickets.map((ticket, ticketIdx) => (
+                        <tr key={`${idx}-${ticketIdx}`} style={{
+                          backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fafafa'
+                        }}>
+                          {ticketIdx === 0 && (
+                            <>
+                              <td rowSpan={customer.tickets.length} style={{ padding: '2px 4px', border: '1px solid #ddd', textAlign: 'center', lineHeight: '1.2' }}>
+                                {customer.id}
+                              </td>
+                              <td rowSpan={customer.tickets.length} style={{ padding: '2px 4px', border: '1px solid #ddd', lineHeight: '1.2' }}>
+                                {customer.name}
+                              </td>
+                              <td rowSpan={customer.tickets.length} style={{ padding: '2px 4px', border: '1px solid #ddd', fontSize: '11px', color: '#666', lineHeight: '1.2' }}>
+                                {customer.furigana}
+                              </td>
+                              <td rowSpan={customer.tickets.length} style={{ padding: '2px 4px', border: '1px solid #ddd', textAlign: 'center', lineHeight: '1.2' }}>
+                                {customer.staff}
+                              </td>
+                              <td rowSpan={customer.tickets.length} style={{ padding: '2px 4px', border: '1px solid #ddd', textAlign: 'center', lineHeight: '1.2', fontWeight: 'bold', color: customer.review === '○' ? '#4CAF50' : customer.review === '×' ? '#f44336' : '#999' }}>
+                                {customer.review}
+                              </td>
+                            </>
+                          )}
+                          <td style={{ padding: '2px 4px', border: '1px solid #ddd' }}>{ticket.ticketName}</td>
+                          <td style={{ padding: '2px 4px', border: '1px solid #ddd', textAlign: 'center' }}>
+                            {ticket.remaining}
+                          </td>
+                          <td style={{ padding: '2px 4px', border: '1px solid #ddd', textAlign: 'center', fontSize: '11px' }}>
+                            {ticket.lastUsed}
+                          </td>
+                        </tr>
+                      ))
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {!isLoading && targetCustomers.length === 0 && (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px',
+                color: '#999',
+                fontSize: '16px'
+              }}>
+                該当する顧客が見つかりませんでした
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<TicketSearchApp />, document.getElementById('root'));
+  </script>
+</body>
+</html>

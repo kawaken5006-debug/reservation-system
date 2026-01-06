@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>空き状況確認 - クリニック予約システム</title>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel (JSX変換) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+
+    .nav-buttons {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      padding: 20px;
+      background: #f8f9fa;
+    }
+
+    .nav-btn {
+      padding: 10px 20px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .nav-btn:hover {
+      background: #f0f0f0;
+    }
+
+    .month-title {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      padding: 20px;
+    }
+
+    .calendar-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 800px;
+    }
+
+    .calendar-table th {
+      background: #f8f9fa;
+      padding: 12px 8px;
+      font-size: 12px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    .calendar-table td {
+      padding: 12px 8px;
+      border: 1px solid #ddd;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .calendar-table td.time-col {
+      background: #f8f9fa;
+      font-weight: bold;
+      font-size: 13px;
+      width: 80px;
+    }
+
+    .date-header {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .date-num {
+      font-size: 16px;
+      display: block;
+    }
+
+    .date-day {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .date-day.sat {
+      color: #2196F3;
+    }
+
+    .date-day.sun {
+      color: #f44336;
+    }
+
+    .slot {
+      font-size: 24px;
+      cursor: pointer;
+      padding: 8px;
+      transition: all 0.2s;
+      display: inline-block;
+      min-width: 30px;
+    }
+
+    .slot.available {
+      color: #FF1493;
+    }
+
+    .slot.available:hover {
+      background: #fff0f5;
+      transform: scale(1.2);
+      border-radius: 4px;
+    }
+
+    .slot.full {
+      color: #999;
+      cursor: not-allowed;
+    }
+
+    .slot.closed {
+      color: #ddd;
+    }
+
+    .slot.selected {
+      background: #667eea;
+      color: white;
+      border-radius: 4px;
+      transform: scale(1.2);
+    }
+
+    .booking-form {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 30px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 1000;
+      display: none;
+    }
+
+    .booking-form.active {
+      display: block;
+    }
+    
+    .booking-form::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: -1;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      max-width: 500px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .submit-btn {
+      background: #667eea;
+      color: white;
+      padding: 12px 30px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .submit-btn:hover {
+      background: #5568d3;
+    }
+
+    .cancel-btn {
+      background: #999;
+      color: white;
+      padding: 12px 30px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .cancel-btn:hover {
+      background: #777;
+    }
+
+    .selected-info {
+      background: #fff3e0;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border-left: 4px solid #ff9800;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 0;
+      }
+
+      .container {
+        border-radius: 0;
+      }
+
+      .calendar-table {
+        font-size: 12px;
+      }
+
+      .slot {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <!-- Firebase初期化 -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBPkeSTfjPbs8HCyZBpfRJ29BlocCkq6BQ",
+      authDomain: "rihacure.firebaseapp.com",
+      projectId: "rihacure",
+      storageBucket: "rihacure.firebasestorage.app",
+      messagingSenderId: "229599758408",
+      appId: "1:229599758408:web:61fb08574bf90c8263f07d"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    console.log('✅ Firebase初期化完了');
+  </script>
+  
+  <script type="text/babel">
+    // テストデータ
+    const BUSINESS_HOURS = {
+      weekday: [
+        '9:00', '9:45', '10:30', '11:15', '11:45',
+        '15:00', '15:45', '16:30', '17:15', '18:00', '18:45', '19:30', '20:15'
+      ],
+      saturday: [
+        '9:00', '9:45', '10:30', '11:15', '11:45'
+      ],
+      sunday: []
+    };
+
+    const TREATMENT_MENUS = [
+      { id: 'new_patient_body', name: '新規（初回）- 身体の施術', duration: 90, isNewPatient: true },
+      { id: 'new_patient_facial', name: '新規（初回）- 美容鍼', duration: 90, isNewPatient: true },
+      { id: 'insurance', name: '保険のみの施術（自費矯正も含む）', duration: 45 },
+      { id: 'raku', name: '保険と自費（楽トレありの方）', duration: 45 },
+      { id: 'facial', name: '美容鍼', duration: 45 }
+    ];
+
+    // existingBookingsは各コンポーネント内で動的に読み込まれます
+
+    const MAX_SLOTS = {
+      '9:00': 11, '9:45': 11, '10:30': 11, '11:15': 11, '11:45': 11,
+      '12:30': 5, '15:00': 11, '15:45': 11, '16:30': 11, '17:15': 11,
+      '18:00': 11, '18:45': 11, '19:30': 11, '20:15': 5
+    };
+
+    function formatDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function getDayOfWeek(date) {
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      return days[date.getDay()];
+    }
+
+
+    const AvailabilityTable = () => {
+      const [currentDate, setCurrentDate] = React.useState(new Date());
+      const [selectedSlot, setSelectedSlot] = React.useState(null);
+      const [showForm, setShowForm] = React.useState(false);
+      const [showLoginStep, setShowLoginStep] = React.useState(false); // ログインステップ表示
+      const [loginChoice, setLoginChoice] = React.useState(null); // 'existing', 'new', 'existing-no-id'
+      const [showLoginForm, setShowLoginForm] = React.useState(false); // ログインフォーム表示フラグ
+      const [showPasswordSetup, setShowPasswordSetup] = React.useState(false); // パスワード登録画面
+      const [passwordConfirm, setPasswordConfirm] = React.useState(''); // パスワード確認用
+      const [verificationMethod, setVerificationMethod] = React.useState('email'); // 'email' or 'sms'
+      const [verificationSent, setVerificationSent] = React.useState(false); // 認証URL送信済み
+      const [existingBookings, setExistingBookings] = React.useState({});
+      const [formData, setFormData] = React.useState({
+        customerId: '',
+        password: '',
+        name: '',
+        phone: '',
+        email: '',
+        treatment: ''
+      });
+
+      // 予約データを読み込み
+      React.useEffect(() => {
+        const loadBookings = async () => {
+          try {
+            const snapshot = await db.collection('reservations').get();
+            const allData = {};
+            snapshot.forEach(doc => {
+              allData[doc.id] = doc.data();
+            });
+            
+            // 日付ごとに予約枠を集計
+            const bookingsByDate = {};
+            
+            Object.keys(allData).forEach(dateKey => {
+              const dateData = allData[dateKey];
+              if (!dateData || !dateData.data) return;
+              
+              const bookings = [];
+              const data = dateData.data;
+              
+              // すべての予約枠をチェック
+              Object.keys(data).forEach(key => {
+                if (key.endsWith('-name')) {
+                  const nameValue = data[key]?.name;
+                  if (nameValue && nameValue.trim() !== '') {
+                    // キーから時間と列を抽出: "9:45-0-name" -> time="9:45", col=0
+                    const parts = key.split('-');
+                    if (parts.length >= 3) {
+                      const time = parts[0];  // 既に完成した時間（"9:45"）
+                      const col = parseInt(parts[1]);
+                      bookings.push({ time, col });
+                    }
+                  }
+                }
+              });
+              
+              if (bookings.length > 0) {
+                bookingsByDate[dateKey] = bookings;
+              }
+            });
+            
+            console.log('📊 読み込んだ予約データ:', bookingsByDate);
+            setExistingBookings(bookingsByDate);
+          } catch (error) {
+            console.error('❌ 予約データ読み込みエラー:', error);
+          }
+        };
+        
+        loadBookings();
+      }, []);
+
+      const getDates = () => {
+        const dates = [];
+        const start = new Date(currentDate);
+        start.setDate(start.getDate() - 3);
+        
+        for (let i = 0; i < 14; i++) {
+          const date = new Date(start);
+          date.setDate(start.getDate() + i);
+          dates.push(date);
+        }
+        return dates;
+      };
+
+      const getAvailability = (date) => {
+        const dateStr = formatDate(date);
+        const dayOfWeek = date.getDay();
+        
+        let timeSlots;
+        if (dayOfWeek === 0) {
+          timeSlots = BUSINESS_HOURS.sunday;
+        } else if (dayOfWeek === 6) {
+          timeSlots = BUSINESS_HOURS.saturday;
+        } else {
+          timeSlots = BUSINESS_HOURS.weekday;
+        }
+        
+        const bookings = existingBookings[dateStr] || [];
+        
+        return timeSlots.map(time => {
+          const bookedCount = bookings.filter(b => b.time === time).length;
+          const maxSlots = MAX_SLOTS[time] || 11;
+          const available = maxSlots - bookedCount;
+          
+          return {
+            time,
+            available: available > 0,
+            status: available > 0 ? 'available' : 'full'
+          };
+        });
+      };
+
+      const timeSlots = [
+        '9:00', '9:45', '10:30', '11:15', '11:45',
+        '15:00', '15:45', '16:30', '17:15', '18:00', '18:45', '19:30', '20:15'
+      ];
+
+      const dates = getDates();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const handleSlotClick = (date, time, available) => {
+        if (!available || date < today) return;
+        
+        setSelectedSlot({ date, time });
+        setShowLoginStep(true); // まずログインステップを表示
+        setLoginChoice(null);
+        setShowLoginForm(false);
+        setShowPasswordSetup(false);
+        setPasswordConfirm('');
+        setShowForm(false);
+      };
+
+      // ログイン処理
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        try {
+          const customerDoc = await db.collection('customers').doc(formData.customerId).get();
+          
+          let result;
+          if (!customerDoc.exists) {
+            result = { success: false, message: '顧客IDが見つかりません' };
+          } else {
+            const customer = customerDoc.data();
+            if (customer.password === formData.password) {
+              result = { success: true, customer };
+            } else {
+              result = { success: false, message: 'パスワードが一致しません' };
+            }
+          }
+          
+          if (result.success) {
+            // ログイン成功 - 情報自動入力
+            setFormData(prev => ({
+              ...prev,
+              customerId: result.customer.id, // 明示的にIDを保持
+              name: result.customer.name,
+              phone: result.customer.phone,
+              email: result.customer.email || ''
+            }));
+            setShowLoginStep(false);
+            setShowForm(true);
+            alert('ログインしました！情報が自動入力されています。');
+          } else {
+            alert('ログインに失敗しました');
+          }
+        } catch (error) {
+          console.error('ログインエラー:', error);
+          alert('エラーが発生しました');
+        }
+      };
+
+      const handleSubmit = async () => {
+        console.log('🔵 handleSubmit開始');
+        
+        // 電話番号またはメールアドレスのどちらかが必須
+        if (!formData.name || (!formData.phone && !formData.email) || !formData.treatment) {
+          alert('お名前、連絡先（電話番号またはメールアドレス）、施術内容を入力してください');
+          return;
+        }
+
+        // 予約データを作成
+        const selectedMenu = TREATMENT_MENUS.find(m => m.id === formData.treatment);
+        
+        // デバッグログ追加
+        console.log('🔍 デバッグ開始 ================');
+        console.log('🔍 formData:', formData);
+        console.log('🔍 formData.treatment:', formData.treatment);
+        console.log('🔍 selectedMenu:', selectedMenu);
+        console.log('🔍 selectedMenu?.isNewPatient:', selectedMenu?.isNewPatient);
+        console.log('🔍 TREATMENT_MENUS:', TREATMENT_MENUS);
+        
+        const bookingData = {
+          date: formatDate(selectedSlot.date),
+          time: selectedSlot.time,
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          treatment: formData.treatment,
+          isNewPatient: selectedMenu?.isNewPatient || false,
+          bookingDate: new Date().toISOString(),
+          source: 'web',
+          id: formData.customerId || `WEB_${Date.now()}` // ログイン済みなら既存ID、そうでなければ新規ID
+        };
+
+        console.log('🔍 bookingData:', bookingData);
+        console.log('🔍 bookingData.isNewPatient:', bookingData.isNewPatient);
+        console.log('🔍 デバッグ終了 ================');
+        console.log('✅ 予約確定:', bookingData);
+
+        // サーバーに送信
+        try {
+          console.log('🔵 Firestoreに送信開始');
+          
+          await db.collection('webBookings').add({
+            ...bookingData,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          
+          const result = { success: true };
+          console.log('✅ Firestore保存完了');
+          
+          if (result.success) {
+            alert(`予約が完了しました！\n\n日時: ${bookingData.date} ${bookingData.time}\nお名前: ${bookingData.name}\n\n確認メールをお送りしました。`);
+            
+            console.log('🔵 画面更新処理開始');
+            // 既存予約に追加（state更新）
+            const dateStr = bookingData.date;
+            setExistingBookings(prev => {
+              const updated = { ...prev };
+              if (!updated[dateStr]) {
+                updated[dateStr] = [];
+              }
+              updated[dateStr] = [...updated[dateStr], {
+                time: bookingData.time,
+                col: updated[dateStr].filter(b => b.time === bookingData.time).length
+              }];
+              return updated;
+            });
+            
+            console.log('🔵 フォームを閉じます');
+            handleCancel();
+            console.log('🔵 再レンダリング');
+            
+            console.log('✅ handleSubmit完了');
+          } else {
+            throw new Error(result.message || '予約に失敗しました');
+          }
+          
+        } catch (error) {
+          console.error('❌ 予約送信エラー:', error);
+          console.error('❌ エラー詳細:', error.message);
+          alert('予約の送信に失敗しました。もう一度お試しください。');
+        }
+      };
+
+      const handleCancel = () => {
+        setShowForm(false);
+        setSelectedSlot(null);
+        setFormData({ name: '', phone: '', email: '', treatment: '' });
+      };
+
+      const handlePrevWeek = () => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() - 7);
+        setCurrentDate(newDate);
+      };
+
+      const handleNextWeek = () => {
+        const newDate = new Date(currentDate);
+        newDate.setDate(newDate.getDate() + 7);
+        setCurrentDate(newDate);
+      };
+
+      return (
+        <div className="container">
+          <div className="header">
+            <h1>🏥 空き状況確認・予約</h1>
+            <p>◎ = 空きあり / × = 満席 / － = 休診日</p>
+          </div>
+
+          <div className="nav-buttons">
+            <button className="nav-btn" onClick={handlePrevWeek}>← 前の一週間</button>
+            <div className="month-title">
+              {currentDate.getFullYear()}年{currentDate.getMonth() + 1}月
+            </div>
+            <button className="nav-btn" onClick={handleNextWeek}>次の一週間 →</button>
+          </div>
+
+          <div className="table-wrapper">
+            <table className="calendar-table">
+              <thead>
+                <tr>
+                  <th style={{width: '80px'}}>時間</th>
+                  {dates.map((date, i) => {
+                    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+                    const isSat = date.getDay() === 6;
+                    const isSun = date.getDay() === 0;
+                    
+                    return (
+                      <th key={i}>
+                        <div className="date-header">
+                          <span className="date-num">{date.getDate()}</span>
+                          <span className={`date-day ${isSat ? 'sat' : ''} ${isSun ? 'sun' : ''}`}>
+                            ({dayOfWeek})
+                          </span>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {timeSlots.map(time => (
+                  <tr key={time}>
+                    <td className="time-col">{time}</td>
+                    {dates.map((date, i) => {
+                      const availability = getAvailability(date);
+                      const slot = availability.find(s => s.time === time);
+                      const isPast = date < today;
+                      const isSunday = date.getDay() === 0;
+                      const isSaturday = date.getDay() === 6;
+                      
+                      const isAfternoon = parseInt(time.split(':')[0]) >= 15;
+                      const isClosed = isSunday || (isSaturday && isAfternoon);
+
+                      const isSelected = selectedSlot && 
+                        selectedSlot.date.getTime() === date.getTime() && 
+                        selectedSlot.time === time;
+
+                      let icon = '◎';
+                      let className = 'slot available';
+                      
+                      if (isPast || isClosed) {
+                        icon = '－';
+                        className = 'slot closed';
+                      } else if (!slot || slot.status === 'full') {
+                        icon = '×';
+                        className = 'slot full';
+                      }
+
+                      if (isSelected) {
+                        className += ' selected';
+                      }
+
+                      return (
+                        <td key={i}>
+                          <div 
+                            className={className}
+                            onClick={() => handleSlotClick(date, time, slot?.status === 'available' && !isPast && !isClosed)}
+                          >
+                            {icon}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ログインステップ */}
+          {showLoginStep && selectedSlot && (
+            <div className="booking-form active">
+              <h2>📝 予約フォーム</h2>
+              
+              <div className="selected-info">
+                <strong>選択された日時:</strong><br />
+                {formatDate(selectedSlot.date)} ({getDayOfWeek(selectedSlot.date)}) {selectedSlot.time}
+              </div>
+
+              {/* Step 1: 既存 or 新規選択 */}
+              {loginChoice === null && (
+                <div style={{marginTop: '20px'}}>
+                  <h3 style={{marginBottom: '15px'}}>患者タイプを選択してください</h3>
+                  <button 
+                    className="submit-btn" 
+                    style={{width: '100%', marginBottom: '10px'}}
+                    onClick={() => setLoginChoice('existing')}
+                  >
+                    既存患者の方
+                  </button>
+                  <button 
+                    className="submit-btn" 
+                    style={{width: '100%', backgroundColor: '#4CAF50'}}
+                    onClick={() => {
+                      setLoginChoice('new');
+                      setShowLoginStep(false);
+                      setShowForm(true);
+                    }}
+                  >
+                    初めての方
+                  </button>
+                </div>
+              )}
+
+              {/* Step 2: IDあり or なし */}
+              {loginChoice === 'existing' && !showLoginForm && !showPasswordSetup && (
+                <div style={{marginTop: '20px'}}>
+                  <h3 style={{marginBottom: '15px'}}>IDをお持ちですか？</h3>
+                  <button 
+                    className="submit-btn" 
+                    style={{width: '100%', marginBottom: '10px'}}
+                    onClick={() => setShowLoginForm(true)}
+                  >
+                    IDでログイン
+                  </button>
+                  <button 
+                    className="submit-btn" 
+                    style={{width: '100%', marginBottom: '10px', backgroundColor: '#9C27B0'}}
+                    onClick={() => setShowPasswordSetup(true)}
+                  >
+                    パスワード未登録の方
+                  </button>
+                  <button 
+                    className="submit-btn" 
+                    style={{width: '100%', backgroundColor: '#FF9800'}}
+                    onClick={() => {
+                      setShowLoginStep(false);
+                      setShowForm(true);
+                    }}
+                  >
+                    IDなしで予約
+                  </button>
+                  <button 
+                    className="cancel-btn" 
+                    style={{width: '100%', marginTop: '10px'}}
+                    onClick={() => setLoginChoice(null)}
+                  >
+                    ← 戻る
+                  </button>
+                </div>
+              )}
+
+              {/* Step 3: ログインフォーム */}
+              {showLoginForm && (
+                <form onSubmit={handleLogin} style={{marginTop: '20px'}}>
+                  <h3 style={{marginBottom: '15px'}}>ログイン</h3>
+                  <div className="form-group">
+                    <label>顧客ID</label>
+                    <input 
+                      type="text" 
+                      value={formData.customerId}
+                      onChange={(e) => setFormData({...formData, customerId: e.target.value})}
+                      placeholder="12345"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>パスワード</label>
+                    <input 
+                      type="password" 
+                      value={formData.password}
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                      placeholder="パスワード"
+                      required
+                    />
+                  </div>
+                  <div className="button-group">
+                    <button 
+                      type="button"
+                      className="cancel-btn" 
+                      onClick={() => {
+                        setShowLoginForm(false);
+                        setFormData({...formData, customerId: '', password: ''});
+                      }}
+                    >
+                      ← 戻る
+                    </button>
+                    <button type="submit" className="submit-btn">ログイン</button>
+                  </div>
+                </form>
+              )}
+
+              {/* Step 3-2: パスワード登録フォーム */}
+              {showPasswordSetup && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  
+                  // パスワード一致チェック
+                  if (formData.password !== passwordConfirm) {
+                    alert('パスワードが一致しません');
+                    return;
+                  }
+                  
+                  if (formData.password.length < 4) {
+                    alert('パスワードは4文字以上で設定してください');
+                    return;
+                  }
+                  
+                  // 認証方法のバリデーション
+                  if (verificationMethod === 'email' && !formData.email) {
+                    alert('メールアドレスを入力してください');
+                    return;
+                  }
+                  
+                  if (verificationMethod === 'sms' && !formData.phone) {
+                    alert('電話番号を入力してください');
+                    return;
+                  }
+                  
+                  try {
+                    // TODO: Firebase Cloud Functionsでメール送信を実装
+                    // 現在は認証スキップ
+                    console.log('認証スキップ（開発中）');
+                    const result = { success: true, message: '認証をスキップしました' };
+                    
+                    setVerificationSent(true);
+                    alert('認証をスキップしました（開発中）');
+                  } catch (error) {
+                    console.error('エラー:', error);
+                    alert('認証処理中にエラーが発生しました');
+                  }
+                }} style={{marginTop: '20px'}}>
+                  <h3 style={{marginBottom: '15px'}}>パスワード設定</h3>
+                  
+                  {!verificationSent ? (
+                    <>
+                      <div className="form-group">
+                        <label>顧客ID</label>
+                        <input 
+                          type="text" 
+                          value={formData.customerId}
+                          onChange={(e) => setFormData({...formData, customerId: e.target.value})}
+                          placeholder="12345"
+                          required
+                        />
+                      </div>
+                      
+                      <div className="form-group">
+                        <label>認証方法を選択</label>
+                        <div style={{display: 'flex', gap: '10px', marginBottom: '10px'}}>
+                          <button 
+                            type="button"
+                            onClick={() => setVerificationMethod('email')}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              backgroundColor: verificationMethod === 'email' ? '#667eea' : '#e0e0e0',
+                              color: verificationMethod === 'email' ? 'white' : '#333',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            📧 メール
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setVerificationMethod('sms')}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              backgroundColor: verificationMethod === 'sms' ? '#667eea' : '#e0e0e0',
+                              color: verificationMethod === 'sms' ? 'white' : '#333',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            📱 SMS
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {verificationMethod === 'email' && (
+                        <div className="form-group">
+                          <label>メールアドレス <span style={{color: 'red'}}>*</span></label>
+                          <input 
+                            type="email" 
+                            value={formData.email}
+                            onChange={(e) => setFormData({...formData, email: e.target.value})}
+                            placeholder="example@email.com"
+                            required
+                          />
+                        </div>
+                      )}
+                      
+                      {verificationMethod === 'sms' && (
+                        <div className="form-group">
+                          <label>電話番号 <span style={{color: 'red'}}>*</span></label>
+                          <input 
+                            type="tel" 
+                            value={formData.phone}
+                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                            placeholder="090-1234-5678"
+                            required
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="form-group">
+                        <label>パスワード（4文字以上）</label>
+                        <input 
+                          type="password" 
+                          value={formData.password}
+                          onChange={(e) => setFormData({...formData, password: e.target.value})}
+                          placeholder="パスワード"
+                          required
+                          minLength="4"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>パスワード（確認）</label>
+                        <input 
+                          type="password" 
+                          value={passwordConfirm}
+                          onChange={(e) => setPasswordConfirm(e.target.value)}
+                          placeholder="もう一度入力"
+                          required
+                          minLength="4"
+                        />
+                      </div>
+                      <div className="button-group">
+                        <button 
+                          type="button"
+                          className="cancel-btn" 
+                          onClick={() => {
+                            setShowPasswordSetup(false);
+                            setFormData({...formData, customerId: '', password: ''});
+                            setPasswordConfirm('');
+                          }}
+                        >
+                          ← 戻る
+                        </button>
+                        <button type="submit" className="submit-btn">認証URLを送信</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{textAlign: 'center', padding: '30px 20px'}}>
+                      <div style={{fontSize: '48px', marginBottom: '20px'}}>✉️</div>
+                      <h3 style={{marginBottom: '15px', color: '#667eea'}}>認証URLを送信しました</h3>
+                      <p style={{marginBottom: '20px', lineHeight: '1.6'}}>
+                        {verificationMethod === 'email' 
+                          ? `${formData.email} に認証URLを送信しました。`
+                          : `${formData.phone} にSMSで認証URLを送信しました。`}
+                      </p>
+                      <p style={{marginBottom: '20px', color: '#666', fontSize: '14px'}}>
+                        メール/SMSに記載されたURLをクリックすると予約が完了します。
+                      </p>
+                      <div style={{
+                        backgroundColor: '#fff3e0',
+                        padding: '15px',
+                        borderRadius: '4px',
+                        marginBottom: '20px',
+                        borderLeft: '4px solid #ff9800'
+                      }}>
+                        <p style={{margin: 0, fontSize: '14px'}}>
+                          <strong>予約内容:</strong><br/>
+                          日時: {selectedSlot && `${formatDate(selectedSlot.date)} ${selectedSlot.time}`}<br/>
+                          ID: {formData.customerId}
+                        </p>
+                      </div>
+                      <button 
+                        type="button"
+                        className="cancel-btn" 
+                        style={{width: '100%'}}
+                        onClick={() => {
+                          setVerificationSent(false);
+                          setShowPasswordSetup(false);
+                          setShowLoginStep(false);
+                          setSelectedSlot(null);
+                        }}
+                      >
+                        閉じる
+                      </button>
+                    </div>
+                  )}
+                </form>
+              )}
+
+              {/* 全体キャンセルボタン（ログインフォーム以外で表示） */}
+              {loginChoice === null && (
+                <button 
+                  className="cancel-btn" 
+                  style={{width: '100%', marginTop: '10px'}}
+                  onClick={() => {
+                    setShowLoginStep(false);
+                    setLoginChoice(null);
+                    setSelectedSlot(null);
+                  }}
+                >
+                  キャンセル
+                </button>
+              )}
+            </div>
+          )}
+
+          {showForm && selectedSlot && (
+            <div className="booking-form active">
+              <h2>📝 予約情報入力</h2>
+              
+              <div className="selected-info">
+                <strong>選択された日時:</strong><br />
+                {formatDate(selectedSlot.date)} ({getDayOfWeek(selectedSlot.date)}) {selectedSlot.time}
+              </div>
+
+              <div className="form-group">
+                <label>お名前 <span style={{color: 'red'}}>*</span></label>
+                <input 
+                  type="text" 
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="山田 太郎"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>電話番号</label>
+                <input 
+                  type="tel" 
+                  value={formData.phone}
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  placeholder="090-1234-5678"
+                  readOnly={formData.customerId && formData.phone} 
+                  style={formData.customerId && formData.phone ? {backgroundColor: '#f0f0f0', cursor: 'not-allowed'} : {}}
+                />
+                {formData.customerId && formData.phone && (
+                  <small style={{color: '#666', fontSize: '12px'}}>※ログイン済みのため変更できません</small>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>メールアドレス</label>
+                <small style={{color: '#666', fontSize: '12px', marginLeft: '10px'}}>※電話番号またはメールアドレスのどちらか必須</small>
+                <input 
+                  type="email" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder="example@email.com"
+                  readOnly={formData.customerId && formData.email}
+                  style={formData.customerId && formData.email ? {backgroundColor: '#f0f0f0', cursor: 'not-allowed'} : {}}
+                />
+                {formData.customerId && formData.email && (
+                  <small style={{color: '#666', fontSize: '12px'}}>※ログイン済みのため変更できません</small>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>施術メニュー <span style={{color: 'red'}}>*</span></label>
+                <select 
+                  value={formData.treatment}
+                  onChange={(e) => setFormData({...formData, treatment: e.target.value})}
+                >
+                  <option value="">選択してください</option>
+                  {TREATMENT_MENUS
+                    .filter(menu => {
+                      // 初めての方は新規メニューのみ
+                      if (loginChoice === 'new') {
+                        return menu.isNewPatient === true;
+                      }
+                      // 既存の方は既存メニューのみ
+                      return menu.isNewPatient !== true;
+                    })
+                    .map(menu => (
+                      <option key={menu.id} value={menu.id}>{menu.name}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="button-group">
+                <button className="cancel-btn" onClick={handleCancel}>キャンセル</button>
+                <button className="submit-btn" onClick={handleSubmit}>予約を確定する</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<AvailabilityTable />);
+  </script>
+</body>
+</html>

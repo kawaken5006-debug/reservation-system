@@ -1,0 +1,9 @@
+{
+  "short_name": "予約システム",
+  "name": "リハキュア予約管理システム",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}

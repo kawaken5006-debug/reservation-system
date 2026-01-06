@@ -1,0 +1,92 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f0f4f8;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* iPadでの表示最適化 */
+@media (max-width: 1024px) {
+  body {
+    font-size: 14px;
+  }
+  
+  /* iPad用 - 検索欄も調整 */
+  input[type="text"][placeholder="名前・ふりがな・IDで検索..."] {
+    font-size: 13px !important;
+  }
+}
+
+/* スマートフォンでの表示最適化 */
+@media (max-width: 768px) {
+  body {
+    font-size: 12px;
+  }
+}
+
+/* iPad 12インチ横向き対応 - 12枠表示 */
+/* 予約表のテーブルのみに適用（統計セクションは除外） */
+table:not([data-stats-table]) {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+table:not([data-stats-table]) td, 
+table:not([data-stats-table]) th {
+  padding: 4px !important;
+  font-size: 10px !important;
+  min-width: 80px !important;
+  max-width: 90px !important;
+}
+
+/* セルのサイズ（予約表のみ） */
+table:not([data-stats-table]) td {
+  width: 80px !important;
+}
+
+/* 入力フィールド（名前入力欄・検索欄以外） */
+input[type="text"]:not([placeholder="空"]):not([placeholder="名前・ふりがな・IDで検索..."]) {
+  width: 100% !important;
+  font-size: 10px !important;
+  padding: 3px !important;
+  box-sizing: border-box !important;
+}
+
+/* 名前入力欄専用スタイル - フォントサイズはJSで動的制御 */
+input[type="text"][placeholder="空"] {
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  box-sizing: border-box !important;
+  line-height: 30px !important;
+  height: 30px !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+}
+
+/* 名前検索欄専用スタイル */
+input[type="text"][placeholder="名前・ふりがな・IDで検索..."] {
+  font-size: 15px !important;
+}
+
+/* ボタンサイズ */
+button {
+  font-size: 10px !important;
+}
+/* ポップアップを最前面に表示 */
+div[data-dropdown="true"],
+div[data-memo-popup="true"] {
+  z-index: 999999 !important;
+  position: absolute !important;
+}
