@@ -259,20 +259,30 @@ export default function ReservationSheet() {
         
         // ネット予約データ読み込み（サーバーAPIから）
         try {
-          console.log('🔄 ネット予約データを読み込んでいます...');
-          const response = await fetch('http://localhost:5000/api/web-bookings');
-          const result = await response.json();
+          const { collection, getDocs } = await import('firebase/firestore');
+          const { db } = await import('./firebaseConfig');
           
-          if (result.success && result.bookings.length > 0) {
-            const webBookings = result.bookings;
+          const webBookingsSnapshot = await getDocs(collection(db, 'webBookings'));
+          const webBookings = [];
+          webBookingsSnapshot.forEach(doc => {
+            webBookings.push({ id: doc.id, ...doc.data() });
+          });
+          
+          if (webBookings.length > 0) {
             console.log('🌐 ネット予約データ:', webBookings.length, '件');
+            console.log('🔍 DEBUG: webBookings配列:', webBookings);
+            console.log('🔍 DEBUG: 最初の予約:', webBookings[0]);
             
             // customerDbの現在値を取得（クロージャ問題回避）
             setCustomerDb(currentCustomerDb => {
+              console.log('🔍 DEBUG: setCustomerDb呼び出し開始');
               setAllDataByDate(prev => {
+                console.log('🔍 DEBUG: setAllDataByDate呼び出し開始');
+                console.log('🔍 DEBUG: 既存データ日数:', Object.keys(prev).length);
                 const newData = { ...prev };
                 
                 webBookings.forEach(booking => {
+                  console.log('🔍 DEBUG: 予約処理開始:', booking.id, booking.name, booking.date, booking.time);
                   const dateKey = booking.date;
                   if (!newData[dateKey]) {
                   newData[dateKey] = {
@@ -405,6 +415,8 @@ export default function ReservationSheet() {
                 console.log(`📝 ネット予約追加: ${booking.date} ${booking.time} ${booking.name}${booking.isNewPatient ? '【新規】' : ''}`);
               });
               
+              console.log('🔍 DEBUG: 全予約処理完了。更新後のデータ日数:', Object.keys(newData).length);
+              console.log('🔍 DEBUG: 更新されたデータ:', newData);
               return newData;
               });
               
@@ -414,10 +426,23 @@ export default function ReservationSheet() {
             
             console.log('✅ ネット予約を予約表に反映しました');
             
-            // 🔧 ネット予約反映後、サーバーに保存
-            console.log('💾 ネット予約データをサーバーに保存中...');
-            await saveToServer(allDataByDate);
-            console.log('✅ ネット予約データの保存完了');
+            // 🔧 ネット予約をFirestoreに即座に保存（リアルタイム更新対策）
+            // 保存開始時点でタイムスタンプを記録（リアルタイム更新をブロック）
+            lastSaveTimestamp.current = Date.now();
+            console.log('💾 ネット予約データをFirestoreに保存中...');
+            // setAllDataByDateの完了を待つため、少し遅延
+            setTimeout(async () => {
+              try {
+                // 最新のallDataByDateを取得して保存
+                setAllDataByDate(currentData => {
+                  saveToServer(currentData);
+                  return currentData;
+                });
+                console.log('✅ ネット予約データの保存完了');
+              } catch (err) {
+                console.error('❌ 保存エラー:', err);
+              }
+            }, 100);
           } else {
             console.log('📊 ネット予約データはありません');
           }
@@ -482,9 +507,10 @@ export default function ReservationSheet() {
     console.log('🚀 リアルタイム更新機能を起動しました（1秒間隔）');
     
     startRealtimeSync((serverData) => {
-      // 保存直後3秒間はリアルタイム同期をスキップ
+      // 保存直後5秒間はリアルタイム同期をスキップ
       const timeSinceLastSave = Date.now() - lastSaveTimestamp.current;
-      if (timeSinceLastSave < 3000) {
+      if (timeSinceLastSave < 5000) {
+        console.log('⏭️ リアルタイム更新スキップ（保存直後 ' + Math.round(timeSinceLastSave/1000) + '秒）');
         return;
       }
       
