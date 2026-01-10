@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>マイページ - リハキュア</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 900px;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .login-screen {
+      padding: 40px;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .login-header h1 {
+      font-size: 28px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .login-header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .login-form {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 15px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #9b59b6;
+      color: white;
+    }
+
+    .btn-link {
+      background: transparent;
+      color: #667eea;
+      text-decoration: underline;
+      padding: 10px;
+    }
+
+    .error-message {
+      background: #fee;
+      color: #c33;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .password-setup {
+      padding: 40px;
+    }
+
+    .password-setup h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .mypage {
+      display: none;
+    }
+
+    .mypage-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+      position: relative;
+    }
+
+    .mypage-header h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .mypage-header p {
+      opacity: 0.9;
+    }
+
+    .logout-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .mypage-content {
+      padding: 30px;
+    }
+
+    .section {
+      margin-bottom: 40px;
+    }
+
+    .section-title {
+      font-size: 20px;
+      color: #333;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #667eea;
+    }
+
+    .booking-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .booking-cell {
+      aspect-ratio: 1;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 5px;
+      font-size: 12px;
+    }
+
+    .booking-cell.booked {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-color: #667eea;
+    }
+
+    .booking-cell .date {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .booking-cell .time {
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    .ticket-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .ticket-card {
+      background: #f8f9fa;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .ticket-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .ticket-count {
+      font-size: 32px;
+      font-weight: 700;
+      color: #667eea;
+      text-align: center;
+      margin: 15px 0;
+    }
+
+    .ticket-count span {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .ticket-usage {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+    }
+
+    .no-data {
+      text-align: center;
+      color: #999;
+      padding: 40px;
+      font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .booking-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      
+      .mypage-header {
+        position: relative;
+      }
+      
+      .logout-btn {
+        position: static;
+        margin-top: 15px;
+        display: block;
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="login-screen" id="loginScreen">
+      <div class="login-header">
+        <h1>🏥 マイページログイン</h1>
+        <p>予約・回数券の確認ができます</p>
+      </div>
+
+      <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+      <div class="login-form">
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="customerId">顧客ID</label>
+            <input type="text" id="customerId" placeholder="12345" required>
+          </div>
+          <div class="form-group">
+            <label for="password">パスワード</label>
+            <input type="password" id="password" placeholder="パスワード" required>
+          </div>
+          <button type="submit" class="btn btn-primary">ログイン</button>
+        </form>
+        <button class="btn btn-secondary" id="showPasswordSetup">パスワード未登録の方</button>
+      </div>
+    </div>
+
+    <div class="password-setup" id="passwordSetupScreen" style="display: none;">
+      <h2>🔐 パスワード設定</h2>
+      
+      <div id="setupErrorMessage" class="error-message" style="display: none;"></div>
+      
+      <form id="passwordSetupForm" class="login-form">
+        <div class="form-group">
+          <label for="setupCustomerId">顧客ID</label>
+          <input type="text" id="setupCustomerId" placeholder="12345" required>
+        </div>
+        <div class="form-group">
+          <label for="newPassword">新しいパスワード</label>
+          <input type="password" id="newPassword" placeholder="8文字以上" required minlength="8">
+        </div>
+        <div class="form-group">
+          <label for="confirmPassword">パスワード確認</label>
+          <input type="password" id="confirmPassword" placeholder="もう一度入力" required>
+        </div>
+        <button type="submit" class="btn btn-primary">パスワード設定</button>
+        <button type="button" class="btn btn-link" id="backToLogin">← ログイン画面に戻る</button>
+      </form>
+    </div>
+
+    <div class="mypage" id="mypage">
+      <div class="mypage-header">
+        <button class="logout-btn" id="logoutBtn">ログアウト</button>
+        <h1>マイページ</h1>
+        <p id="userName"></p>
+      </div>
+
+      <div class="mypage-content">
+        <div class="section">
+          <h2 class="section-title">📅 今後の予約（最大24件）</h2>
+          <div class="booking-grid" id="bookingGrid"></div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">🎫 回数券</h2>
+          <div class="ticket-grid" id="ticketGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+    import { getFirestore, collection, getDocs, doc, getDoc, setDoc, query, where, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDNWom7ao2r37n76RaXpPo5vV0DnW-XLtw",
+      authDomain: "rihacure.firebaseapp.com",
+      projectId: "rihacure",
+      storageBucket: "rihacure.firebasestorage.app",
+      messagingSenderId: "862106618207",
+      appId: "1:862106618207:web:e68f31962e28d893c4d8a3"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const customerId = document.getElementById('customerId').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const customerDoc = await getDoc(doc(db, 'customers', customerId));
+        
+        if (!customerDoc.exists()) {
+          showError('顧客IDが見つかりません');
+          return;
+        }
+
+        const customerData = customerDoc.data();
+
+        if (customerData.password !== password) {
+          showError('パスワードが正しくありません');
+          return;
+        }
+
+        currentUser = { id: customerId, ...customerData };
+        showMypage();
+        
+      } catch (error) {
+        console.error('ログインエラー:', error);
+        showError('ログインに失敗しました');
+      }
+    });
+
+    document.getElementById('showPasswordSetup').addEventListener('click', () => {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('passwordSetupScreen').style.display = 'block';
+    });
+
+    document.getElementById('backToLogin').addEventListener('click', () => {
+      document.getElementById('loginScreen').style.display = 'block';
+      document.getElementById('passwordSetupScreen').style.display = 'none';
+    });
+
+    document.getElementById('passwordSetupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const customerId = document.getElementById('setupCustomerId').value.trim();
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (newPassword !== confirmPassword) {
+        showError('パスワードが一致しません', 'setupErrorMessage');
+        return;
+      }
+
+      if (newPassword.length < 8) {
+        showError('パスワードは8文字以上で入力してください', 'setupErrorMessage');
+        return;
+      }
+
+      try {
+        const customerDoc = await getDoc(doc(db, 'customers', customerId));
+        
+        if (!customerDoc.exists()) {
+          showError('顧客IDが見つかりません', 'setupErrorMessage');
+          return;
+        }
+
+        await setDoc(doc(db, 'customers', customerId), {
+          password: newPassword
+        }, { merge: true });
+
+        alert('パスワードを設定しました！\nログイン画面からログインしてください。');
+        
+        document.getElementById('loginScreen').style.display = 'block';
+        document.getElementById('passwordSetupScreen').style.display = 'none';
+        document.getElementById('passwordSetupForm').reset();
+        
+      } catch (error) {
+        console.error('パスワード設定エラー:', error);
+        showError('パスワード設定に失敗しました', 'setupErrorMessage');
+      }
+    });
+
+    async function showMypage() {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('mypage').style.display = 'block';
+      
+      document.getElementById('userName').textContent = `${currentUser.name} 様（ID: ${currentUser.id}）`;
+      
+      await loadBookings();
+      loadTickets();
+    }
+
+    async function loadBookings() {
+      const bookingGrid = document.getElementById('bookingGrid');
+      bookingGrid.innerHTML = '<div class="no-data">読み込み中...</div>';
+
+      try {
+        console.log('📅 予約データ読み込み開始...');
+        const userBookings = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split('T')[0];
+
+        // 1. reservationsコレクションから取得（管理画面で手動入力した予約）
+        console.log('📊 reservations取得中...');
+        const reservationsSnapshot = await getDocs(collection(db, 'reservations'));
+        console.log(`✅ reservations取得完了: ${reservationsSnapshot.size}件`);
+        
+        reservationsSnapshot.forEach(docSnap => {
+          const dateKey = docSnap.id;
+          const dateData = docSnap.data();
+          
+          const bookingDate = new Date(dateKey);
+          if (bookingDate < today) return;
+
+          if (dateData.data) {
+            Object.keys(dateData.data).forEach(key => {
+              if (key.endsWith('-id')) {
+                const idValue = dateData.data[key]?.id;
+                console.log(`🔍 ${dateKey} ${key}: Firestore="${idValue}" (${typeof idValue}), currentUser="${currentUser.id}" (${typeof currentUser.id}), match=${idValue === currentUser.id}`);
+                
+                if (idValue === currentUser.id) {
+                  const match = key.match(/^(.+)-(\d+)-id$/);
+                  if (match) {
+                    const time = match[1];
+                    const col = match[2];
+                    const nameKey = `${time}-${col}-name`;
+                    const name = dateData.data[nameKey]?.name || '';
+                    
+                    userBookings.push({
+                      date: dateKey,
+                      time: time,
+                      name: name,
+                      source: 'manual'
+                    });
+                  }
+                }
+              }
+            });
+          }
+        });
+        console.log(`✅ reservationsから: ${userBookings.length}件`);
+
+        // 2. webBookingsコレクションから取得（ネット予約）
+        console.log('📊 webBookings取得中...');
+        const webBookingsSnapshot = await getDocs(collection(db, 'webBookings'));
+        console.log(`✅ webBookings取得完了: ${webBookingsSnapshot.size}件`);
+        
+        webBookingsSnapshot.forEach(docSnap => {
+          const booking = docSnap.data();
+          
+          // 自分のIDの予約のみ
+          if (booking.id !== currentUser.id) return;
+          
+          const bookingDate = new Date(booking.date);
+          if (bookingDate < today) return;
+          
+          userBookings.push({
+            date: booking.date,
+            time: booking.time,
+            name: booking.name,
+            source: 'web'
+          });
+        });
+        console.log(`✅ webBookingsから: ${userBookings.filter(b => b.source === 'web').length}件`);
+        console.log(`✅ 合計: ${userBookings.length}件`);
+
+        // 日付順にソート
+        userBookings.sort((a, b) => {
+          if (a.date !== b.date) return a.date.localeCompare(b.date);
+          return a.time.localeCompare(b.time);
+        });
+
+        // 最大24件まで表示
+        const displayBookings = userBookings.slice(0, 24);
+
+        bookingGrid.innerHTML = '';
+
+        if (displayBookings.length === 0) {
+          bookingGrid.innerHTML = '<div class="no-data">予約がありません</div>';
+          return;
+        }
+
+        displayBookings.forEach(booking => {
+          const cell = document.createElement('div');
+          cell.className = 'booking-cell booked';
+          
+          const dateObj = new Date(booking.date);
+          const month = dateObj.getMonth() + 1;
+          const day = dateObj.getDate();
+          
+          cell.innerHTML = `
+            <div class="date">${month}/${day}</div>
+            <div class="time">${booking.time}</div>
+          `;
+          
+          bookingGrid.appendChild(cell);
+        });
+
+        // 残りを空セルで埋める
+        const emptyCount = 24 - displayBookings.length;
+        for (let i = 0; i < emptyCount; i++) {
+          const cell = document.createElement('div');
+          cell.className = 'booking-cell';
+          cell.innerHTML = '<div class="date">-</div>';
+          bookingGrid.appendChild(cell);
+        }
+
+      } catch (error) {
+        console.error('予約読み込みエラー:', error);
+        bookingGrid.innerHTML = '<div class="no-data">予約の読み込みに失敗しました</div>';
+      }
+    }
+
+    function loadTickets() {
+      const ticketGrid = document.getElementById('ticketGrid');
+      ticketGrid.innerHTML = '';
+
+      if (!currentUser.tickets || currentUser.tickets.length === 0) {
+        ticketGrid.innerHTML = '<div class="no-data">回数券がありません</div>';
+        return;
+      }
+
+      currentUser.tickets.forEach(ticket => {
+        const remaining = ticket.count - (ticket.used?.length || 0);
+        
+        const card = document.createElement('div');
+        card.className = 'ticket-card';
+        
+        card.innerHTML = `
+          <div class="ticket-name">${ticket.name}</div>
+          <div class="ticket-count">
+            残り <strong>${remaining}</strong> <span>/ ${ticket.count}回</span>
+          </div>
+          <div class="ticket-usage">
+            使用済み: ${ticket.used?.length || 0}回
+          </div>
+        `;
+        
+        ticketGrid.appendChild(card);
+      });
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      currentUser = null;
+      document.getElementById('mypage').style.display = 'none';
+      document.getElementById('loginScreen').style.display = 'block';
+      document.getElementById('loginForm').reset();
+    });
+
+    function showError(message, elementId = 'errorMessage') {
+      const errorElement = document.getElementById(elementId);
+      errorElement.textContent = message;
+      errorElement.style.display = 'block';
+      
+      setTimeout(() => {
+        errorElement.style.display = 'none';
+      }, 5000);
+    }
+  </script>
+</body>
+</html>
