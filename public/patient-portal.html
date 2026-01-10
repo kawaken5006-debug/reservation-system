@@ -488,6 +488,8 @@
           const bookingDate = new Date(dateKey);
           if (bookingDate < today) return;
 
+          console.log(`📄 ${dateKey}: data=${dateData.data ? 'あり' : 'なし'}, keys=${dateData.data ? Object.keys(dateData.data).length : 0}`);
+          
           if (dateData.data) {
             Object.keys(dateData.data).forEach(key => {
               if (key.endsWith('-id')) {
