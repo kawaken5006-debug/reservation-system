@@ -1,4 +1,4 @@
-// Firestore版 serverSync.js
+// Firestore版 serverSync.js（最適化版）
 import { db } from './firebaseConfig';
 import { 
   collection, 
@@ -35,20 +35,30 @@ export const loadFromServer = async () => {
   }
 };
 
-// サーバーにデータを保存
-export const saveToServer = async (data) => {
-  console.log('💾 Firestoreにデータを保存中...');
-  
+// サーバーにデータを保存（最適化版：特定の日付のみ保存）
+export const saveToServer = async (allData, skipMerge = false, specificDateKey = null) => {
   try {
-    // 各日付のデータを個別に保存
-    for (const [dateKey, dateData] of Object.entries(data)) {
-      if (dateKey === 'customer-db' || dateKey.length === 4) continue; // 顧客DBと年データはスキップ
-      
-      const docRef = doc(db, 'reservations', dateKey);
-      await setDoc(docRef, dateData, { merge: true });
+    // 特定の日付のみ保存する場合（高速）
+    if (specificDateKey) {
+      console.log(`💾 Firestore保存: ${specificDateKey}のみ`);
+      if (allData[specificDateKey]) {
+        const docRef = doc(db, 'reservations', specificDateKey);
+        await setDoc(docRef, allData[specificDateKey], { merge: !skipMerge });
+        console.log(`✅ ${specificDateKey} 保存完了`);
+      }
+      return true;
     }
     
+    // 全日付保存（初回読み込み時のみ）
+    console.log('💾 Firestoreに全データを保存中...');
+    for (const [dateKey, dateData] of Object.entries(allData)) {
+      if (dateKey === 'customer-db' || dateKey.length === 4) continue;
+      
+      const docRef = doc(db, 'reservations', dateKey);
+      await setDoc(docRef, dateData, { merge: !skipMerge });
+    }
     console.log('✅ Firestoreへの保存完了');
+    
     return true;
   } catch (error) {
     console.error('❌ Firestore保存エラー:', error);
@@ -56,20 +66,38 @@ export const saveToServer = async (data) => {
   }
 };
 
-// 顧客データベースを保存
+// 顧客データベースを保存（全件）
 export const saveCustomerDatabaseToServer = async (customerDb) => {
   console.log('👥 顧客データをFirestoreに保存中...');
+  console.log('📊 保存対象:', Object.keys(customerDb).length, '件');
   
   try {
-    for (const customer of customerDb) {
-      const docRef = doc(db, 'customers', customer.id);
-      await setDoc(docRef, customer);
+    let successCount = 0;
+    for (const [customerId, customerData] of Object.entries(customerDb)) {
+      const docRef = doc(db, 'customers', customerId);
+      await setDoc(docRef, customerData);
+      successCount++;
     }
     
-    console.log('✅ 顧客データの保存完了');
+    console.log(`✅ 顧客データの保存完了: ${successCount}件`);
     return true;
   } catch (error) {
     console.error('❌ 顧客データ保存エラー:', error);
+    return false;
+  }
+};
+
+// 特定の顧客1件だけ保存（高速）
+export const saveCustomerToServer = async (customerId, customerData) => {
+  console.log(`💾 顧客保存: ID=${customerId}`);
+  
+  try {
+    const docRef = doc(db, 'customers', customerId);
+    await setDoc(docRef, customerData);
+    console.log(`✅ ID=${customerId} 保存完了`);
+    return true;
+  } catch (error) {
+    console.error(`❌ ID=${customerId} 保存エラー:`, error);
     return false;
   }
 };
@@ -100,7 +128,7 @@ export const loadStaffHolidaysFromServer = async () => {
     
     if (docSnap.exists()) {
       const data = docSnap.data();
-      console.log(`✅ スタッフ休み情報を読み込みました: ${Object.keys(data.holidays || {}).length}日分`);
+      console.log(`✅ スタッフ休み情報を読み込みました`);
       return data.holidays || {};
     } else {
       console.log('⚠️ スタッフ休みデータが見つかりません');
@@ -142,6 +170,5 @@ export const stopRealtimeSync = () => {
 
 // セルの編集中マーク（Firestoreでは不要だが互換性のために残す）
 export const markCellAsEditing = () => {
-  // Firestoreではリアルタイム同期があるため、編集中マークは不要
   return Promise.resolve();
 };
