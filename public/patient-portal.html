@@ -371,6 +371,11 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    
+    // デバッグ用にグローバル公開
+    window.debugDb = db;
+    window.debugGetDocs = getDocs;
+    window.debugCollection = collection;
 
     let currentUser = null;
 
