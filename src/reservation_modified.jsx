@@ -1247,8 +1247,8 @@ export default function ReservationSheet() {
   // 手動保存関数（Enter押下 or フォーカスアウト時）
   const handleManualSave = () => {
     if (initialized && !isRealtimeUpdating) {
-      console.log(`💾 手動保存: ${currentDate}のみ`);
-      saveToServer(allDataByDate, true, currentDate); // 現在の日付のみ保存
+      console.log(`💾 手動保存: ${dateKey}のみ`);
+      saveToServer(allDataByDate, true, dateKey); // 現在の日付のみ保存
       lastSaveTimestamp.current = Date.now();
     }
   };
