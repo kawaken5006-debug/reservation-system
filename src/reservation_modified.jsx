@@ -1247,7 +1247,8 @@ export default function ReservationSheet() {
   // 手動保存関数（Enter押下 or フォーカスアウト時）
   const handleManualSave = () => {
     if (initialized && !isRealtimeUpdating) {
-      saveToServer(allDataByDate, true); // skipMerge=true
+      console.log(`💾 手動保存: ${currentDate}のみ`);
+      saveToServer(allDataByDate, true, currentDate); // 現在の日付のみ保存
       lastSaveTimestamp.current = Date.now();
     }
   };
@@ -1710,11 +1711,11 @@ export default function ReservationSheet() {
         
         // サーバーに保存
         if (initialized && !isRealtimeUpdating) {
-          console.log(`💾 新患の状態${shouldInsertNextSlot ? 'と直下の枠のデータ' : ''}を保存します`);
+          console.log(`💾 新患の状態${shouldInsertNextSlot ? 'と直下の枠のデータ' : ''}を保存: ${dateKey}のみ`);
           if (shouldInsertNextSlot) {
             console.log(`📤 保存内容: nextIdKey=${nextIdKey}, ID=1, name=楽トレ　枠`);
           }
-          saveToServer(updatedData, true).then(() => {
+          saveToServer(updatedData, true, dateKey).then(() => {
             console.log('✅ サーバー保存完了');
           });
         }
@@ -1811,11 +1812,11 @@ export default function ReservationSheet() {
         
         // サーバーに保存
         if (initialized && !isRealtimeUpdating) {
-          console.log(`💾 楽の状態${shouldInsertNextSlot ? 'と直下の枠のデータ' : ''}を保存します`);
+          console.log(`💾 楽の状態${shouldInsertNextSlot ? 'と直下の枠のデータ' : ''}を保存: ${dateKey}のみ`);
           if (shouldInsertNextSlot) {
             console.log(`📤 保存内容: nextIdKey=${nextIdKey}, ID=1, name=楽トレ　枠`);
           }
-          saveToServer(updatedData, true).then(() => {
+          saveToServer(updatedData, true, dateKey).then(() => {
             console.log('✅ サーバー保存完了');
           });
         }
@@ -2037,7 +2038,7 @@ export default function ReservationSheet() {
       
       // サーバーに保存
       if (initialized && !isRealtimeUpdating) {
-        saveToServer(updatedData, true);
+        saveToServer(updatedData, true, dateKey);
       }
       
       return updatedData;
@@ -2152,7 +2153,7 @@ export default function ReservationSheet() {
       // 即座に保存
       if (initialized && !isRealtimeUpdating) {
         console.log('💾 キャンセル履歴編集: 保存');
-        saveToServer(updatedData, true);
+        saveToServer(updatedData, true, dateKey);
       }
       
       return updatedData;
@@ -2195,7 +2196,7 @@ export default function ReservationSheet() {
         // 即座に保存
         if (initialized && !isRealtimeUpdating) {
           console.log('🗑️ キャンセル履歴削除: 保存');
-          saveToServer(updatedData, true);
+          saveToServer(updatedData, true, dateKey);
         }
         
         return updatedData;
@@ -2236,7 +2237,7 @@ export default function ReservationSheet() {
       
       // 即座に保存
       if (initialized && !isRealtimeUpdating) {
-        saveToServer(updatedData, true);
+        saveToServer(updatedData, true, dateKey);
       }
       
       return updatedData;
@@ -2395,7 +2396,7 @@ export default function ReservationSheet() {
       // 即座に保存
       if (initialized && !isRealtimeUpdating) {
         console.log('🗑️ キャンセル処理: データを空に設定して保存');
-        saveToServer(updatedData, true);
+        saveToServer(updatedData, true, dateKey);
       }
       
       return updatedData;
