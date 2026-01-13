@@ -529,7 +529,7 @@
             // ログイン成功 - 情報自動入力
             setFormData(prev => ({
               ...prev,
-              customerId: result.customer.id, // 明示的にIDを保持
+              customerId: formData.customerId, // 入力されたIDをそのまま使用
               name: result.customer.name,
               phone: result.customer.phone,
               email: result.customer.email || ''
