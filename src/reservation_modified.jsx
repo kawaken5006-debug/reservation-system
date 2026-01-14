@@ -14,8 +14,6 @@ import {
 } from './serverSync';
 import { customerDatabase } from './customerDatabase';
 import React, { useState } from 'react';
-import { db } from './firebaseConfig';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 export default function ReservationSheet() {
   // ひらがな→カタカナ変換
@@ -509,9 +507,9 @@ export default function ReservationSheet() {
     console.log('🚀 リアルタイム更新機能を起動しました（1秒間隔）');
     
     startRealtimeSync((serverData) => {
-      // 保存直後5秒間はリアルタイム同期をスキップ
+      // 保存直後10秒間はリアルタイム同期をスキップ
       const timeSinceLastSave = Date.now() - lastSaveTimestamp.current;
-      if (timeSinceLastSave < 5000) {
+      if (timeSinceLastSave < 10000) {
         console.log('⏭️ リアルタイム更新スキップ（保存直後 ' + Math.round(timeSinceLastSave/1000) + '秒）');
         return;
       }
@@ -2283,29 +2281,18 @@ export default function ReservationSheet() {
     const webBookingIdMatch = memoText.match(/ID:\s*([^\n]+)/);
     const webBookingId = webBookingIdMatch ? webBookingIdMatch[1].trim() : null;
     
-    if (webBookingId && (webBookingId.startsWith('WEB_') || /^\d+$/.test(webBookingId) || memoText.includes('【ネット予約】') || memoText.includes('【新規・ネット予約】'))) {
+    if (webBookingId && (webBookingId.startsWith('WEB_') || memoText.includes('【ネット予約】') || memoText.includes('【新規・ネット予約】'))) {
       try {
         console.log('🗑️ ネット予約削除:', webBookingId);
-        
-        // Firestoreから削除
-        const webBookingsRef = collection(db, 'webBookings');
-        const q = query(webBookingsRef, where('id', '==', webBookingId));
-        const snapshot = await getDocs(q);
-        
-        let deletedCount = 0;
-        for (const docSnap of snapshot.docs) {
-          await deleteDoc(doc(db, 'webBookings', docSnap.id));
-          deletedCount++;
-          console.log(`✅ webBookings削除: ${docSnap.id}`);
-        }
-        
-        if (deletedCount > 0) {
-          console.log(`✅ ${deletedCount}件のネット予約を削除しました`);
-        } else {
-          console.log('⚠️ 削除対象のwebBookingsが見つかりませんでした');
+        const response = await fetch(`http://localhost:5000/api/web-bookings/${webBookingId}`, {
+          method: 'DELETE'
+        });
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ サーバーから削除成功:', webBookingId);
         }
       } catch (error) {
-        console.error('❌ Firestore削除エラー:', error);
+        console.error('❌ サーバー削除エラー:', error);
       }
     }
     
