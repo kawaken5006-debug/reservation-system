@@ -2,6 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // 2026年12月31日まで全て許可（開発用）
+    // Updated: 2026-01-14
     match /{document=**} {
       allow read, write: if request.time < timestamp.date(2026, 12, 31);
     }
