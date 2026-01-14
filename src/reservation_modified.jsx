@@ -2284,7 +2284,24 @@ export default function ReservationSheet() {
     if (webBookingId && (webBookingId.startsWith('WEB_') || memoText.includes('【ネット予約】') || memoText.includes('【新規・ネット予約】'))) {
       try {
         console.log('🗑️ ネット予約削除:', webBookingId);
-        const response = await fetch(`http://localhost:5000/api/web-bookings/${webBookingId}`, {
+        // Firestoreから削除
+        const webBookingsRef = collection(db, 'webBookings');
+        const q = query(webBookingsRef, where('id', '==', webBookingId));
+        const snapshot = await getDocs(q);
+        
+        let deletedCount = 0;
+        for (const docSnap of snapshot.docs) {
+          await deleteDoc(doc(db, 'webBookings', docSnap.id));
+          deletedCount++;
+          console.log(`✅ webBookings削除: ${docSnap.id}`);
+        }
+        
+        if (deletedCount > 0) {
+          console.log(`✅ ${deletedCount}件のネット予約を削除しました`);
+        } else {
+          console.log('⚠️ 削除対象のwebBookingsが見つかりませんでした');
+        }
+        /*const response = await fetch(`http://localhost:5000/api/web-bookings/${webBookingId}`, {
           method: 'DELETE'
         });
         const result = await response.json();
