@@ -2409,6 +2409,7 @@ export default function ReservationSheet() {
       // 即座に保存
       if (initialized && !isRealtimeUpdating) {
         console.log('🗑️ キャンセル処理: データを空に設定して保存');
+        lastSaveTimestamp.current = Date.now(); // タイムスタンプ更新
         saveToServer(updatedData, true, dateKey);
       }
       
