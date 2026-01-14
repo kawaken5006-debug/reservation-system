@@ -507,9 +507,9 @@ export default function ReservationSheet() {
     console.log('🚀 リアルタイム更新機能を起動しました（1秒間隔）');
     
     startRealtimeSync((serverData) => {
-      // 保存直後10秒間はリアルタイム同期をスキップ
+      // 保存直後5秒間はリアルタイム同期をスキップ
       const timeSinceLastSave = Date.now() - lastSaveTimestamp.current;
-      if (timeSinceLastSave < 10000) {
+      if (timeSinceLastSave < 5000) {
         console.log('⏭️ リアルタイム更新スキップ（保存直後 ' + Math.round(timeSinceLastSave/1000) + '秒）');
         return;
       }
