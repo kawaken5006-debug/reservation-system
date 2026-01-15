@@ -332,9 +332,10 @@
     // existingBookingsは各コンポーネント内で動的に読み込まれます
 
     const MAX_SLOTS = {
-      '9:00': 11, '9:45': 11, '10:30': 11, '11:15': 11, '11:45': 11,
-      '12:30': 5, '15:00': 11, '15:45': 11, '16:30': 11, '17:15': 11,
-      '18:00': 11, '18:45': 11, '19:30': 11, '20:15': 5
+      '8:30': 11, '9:00': 11, '9:15': 11, '9:45': 11, '10:00': 11, '10:30': 11,
+      '10:45': 11, '11:15': 11, '11:30': 11, '11:45': 11, '12:15': 11, '12:30': 5,
+      '13:00': 11, '13:45': 11, '14:30': 11, '15:00': 11, '15:15': 11, '15:45': 11,
+      '16:00': 11, '16:30': 11, '17:15': 11, '18:00': 11, '18:30': 11, '18:45': 11, '19:30': 11
     };
 
     function formatDate(date) {
@@ -490,9 +491,16 @@
         });
       };
 
-      const timeSlots = [
-        '9:00', '9:45', '10:30', '11:15', '11:45',
-        '15:00', '15:45', '16:30', '17:15', '18:00', '18:45', '19:30', '20:15'
+      // 平日・土曜時間
+      const weekdayTimeSlots = [
+        '9:00', '9:45', '10:30', '11:15', '11:45', '12:30',
+        '15:00', '15:45', '16:30', '17:15', '18:00', '18:30', '18:45', '19:30'
+      ];
+      
+      // 日曜専用時間
+      const sundayTimeSlots = [
+        '8:30', '9:15', '10:00', '10:45', '11:30', '12:15',
+        '13:00', '13:45', '14:30', '15:15', '16:00'
       ];
 
       const dates = getDates();
@@ -668,74 +676,143 @@
           </div>
 
           <div className="table-wrapper">
+          <div className="table-wrapper">
             <table className="calendar-table">
               <thead>
                 <tr>
-                  <th style={{width: '80px'}}>時間</th>
-                  {dates.map((date, i) => {
-                    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
-                    const isSat = date.getDay() === 6;
-                    const isSun = date.getDay() === 0;
+                  {(() => {
+                    const allDates = dates;
+                    const weeks = [];
+                    let currentWeek = [];
                     
-                    return (
-                      <th key={i}>
-                        <div className="date-header">
-                          <span className="date-num">{date.getDate()}</span>
-                          <span className={`date-day ${isSat ? 'sat' : ''} ${isSun ? 'sun' : ''}`}>
-                            ({dayOfWeek})
-                          </span>
-                        </div>
-                      </th>
-                    );
-                  })}
+                    // 週ごとにグループ化
+                    for (let i = 0; i < allDates.length; i++) {
+                      const date = allDates[i];
+                      const dayOfWeek = date.getDay();
+                      
+                      if (dayOfWeek === 1 && currentWeek.length > 0) {
+                        weeks.push([...currentWeek]);
+                        currentWeek = [];
+                      }
+                      currentWeek.push(date);
+                    }
+                    if (currentWeek.length > 0) {
+                      weeks.push(currentWeek);
+                    }
+                    
+                    return weeks.map((week, weekIdx) => {
+                      const mon_sat = [];
+                      let sun = null;
+                      
+                      week.forEach(d => {
+                        if (d.getDay() === 0) sun = d;
+                        else mon_sat.push(d);
+                      });
+                      
+                      return (
+                        <React.Fragment key={weekIdx}>
+                          <th style={{width:'60px',borderRight:'3px solid #333'}}>時間</th>
+                          {mon_sat.map((d,i) => (
+                            <th key={i} style={d.getDay()===6?{borderRight:'3px solid #333'}:{}}>
+                              {d.getDate()}({['日','月','火','水','木','金','土'][d.getDay()]})
+                            </th>
+                          ))}
+                          {sun && <th style={{width:'60px',background:'#ffe',borderRight:'3px solid #333'}}>日曜時間</th>}
+                          {sun && <th style={{borderRight:weekIdx<weeks.length-1?'3px solid #333':''}}>{sun.getDate()}(日)</th>}
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
                 </tr>
               </thead>
               <tbody>
-                {timeSlots.map(time => (
-                  <tr key={time}>
-                    <td className="time-col">{time}</td>
-                    {dates.map((date, i) => {
-                      const availability = getAvailability(date);
-                      const slot = availability.find(s => s.time === time);
-                      const isPast = date < today;
-                      const isSunday = date.getDay() === 0;
-                      const isSaturday = date.getDay() === 6;
-                      
-                      const isAfternoon = parseInt(time.split(':')[0]) >= 15;
-                      const isClosed = isSunday || (isSaturday && isAfternoon);
-
-                      const isSelected = selectedSlot && 
-                        selectedSlot.date.getTime() === date.getTime() && 
-                        selectedSlot.time === time;
-
-                      let icon = '◎';
-                      let className = 'slot available';
-                      
-                      if (isPast || isClosed) {
-                        icon = '－';
-                        className = 'slot closed';
-                      } else if (!slot || slot.status === 'full') {
-                        icon = '×';
-                        className = 'slot full';
-                      }
-
-                      if (isSelected) {
-                        className += ' selected';
-                      }
-
-                      return (
-                        <td key={i}>
-                          <div 
-                            className={className}
-                            onClick={() => handleSlotClick(date, time, slot?.status === 'available' && !isPast && !isClosed)}
-                          >
-                            {icon}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {(() => {
+                  const maxRows = Math.max(weekdayTimeSlots.length, sundayTimeSlots.length);
+                  const rows = [];
+                  const allDates = dates;
+                  
+                  for (let r = 0; r < maxRows; r++) {
+                    const wTime = weekdayTimeSlots[r];
+                    const sTime = sundayTimeSlots[r];
+                    
+                    rows.push(
+                      <tr key={r}>
+                        {(() => {
+                          const weeks = [];
+                          let currentWeek = [];
+                          
+                          for (let i = 0; i < allDates.length; i++) {
+                            const date = allDates[i];
+                            if (date.getDay() === 1 && currentWeek.length > 0) {
+                              weeks.push([...currentWeek]);
+                              currentWeek = [];
+                            }
+                            currentWeek.push(date);
+                          }
+                          if (currentWeek.length > 0) weeks.push(currentWeek);
+                          
+                          return weeks.map((week, weekIdx) => {
+                            const mon_sat = [];
+                            let sun = null;
+                            
+                            week.forEach(d => {
+                              if (d.getDay() === 0) sun = d;
+                              else mon_sat.push(d);
+                            });
+                            
+                            return (
+                              <React.Fragment key={weekIdx}>
+                                <td className="time-col" style={{borderRight:'3px solid #333'}}>{wTime||''}</td>
+                                {mon_sat.map((date,i) => {
+                                  if (!wTime) return <td key={i} style={{background:'#f5f5f5',borderRight:date.getDay()===6?'3px solid #333':''}}>-</td>;
+                                  
+                                  const availability = getAvailability(date);
+                                  const slot = availability.find(s => s.time === wTime);
+                                  const isPast = date < today;
+                                  const isSelected = selectedSlot && selectedSlot.date.getTime()===date.getTime() && selectedSlot.time===wTime;
+                                  
+                                  let icon = '◎', className = 'slot available';
+                                  if (isPast) { icon='－'; className='slot closed'; }
+                                  else if (!slot) { icon='－'; className='slot closed'; }
+                                  else if (slot.status==='full') { icon='×'; className='slot full'; }
+                                  if (isSelected) className += ' selected';
+                                  
+                                  return (
+                                    <td key={i} style={{borderRight:date.getDay()===6?'3px solid #333':''}}>
+                                      <div className={className} onClick={()=>handleSlotClick(date,wTime,slot?.status==='available'&&!isPast)}>{icon}</div>
+                                    </td>
+                                  );
+                                })}
+                                {sun && <td className="time-col" style={{background:'#ffe',borderRight:'3px solid #333'}}>{sTime||''}</td>}
+                                {sun && (() => {
+                                  if (!sTime) return <td style={{background:'#f5f5f5',borderRight:weekIdx<weeks.length-1?'3px solid #333':''}}>-</td>;
+                                  
+                                  const availability = getAvailability(sun);
+                                  const slot = availability.find(s => s.time === sTime);
+                                  const isPast = sun < today;
+                                  const isSelected = selectedSlot && selectedSlot.date.getTime()===sun.getTime() && selectedSlot.time===sTime;
+                                  
+                                  let icon = '◎', className = 'slot available';
+                                  if (isPast) { icon='－'; className='slot closed'; }
+                                  else if (!slot) { icon='－'; className='slot closed'; }
+                                  else if (slot.status==='full') { icon='×'; className='slot full'; }
+                                  if (isSelected) className += ' selected';
+                                  
+                                  return (
+                                    <td style={{borderRight:weekIdx<weeks.length-1?'3px solid #333':''}}>
+                                      <div className={className} onClick={()=>handleSlotClick(sun,sTime,slot?.status==='available'&&!isPast)}>{icon}</div>
+                                    </td>
+                                  );
+                                })()}
+                              </React.Fragment>
+                            );
+                          });
+                        })()}
+                      </tr>
+                    );
+                  }
+                  return rows;
+                })()}
               </tbody>
             </table>
           </div>
