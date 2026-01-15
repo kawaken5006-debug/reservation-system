@@ -95,6 +95,7 @@ export default function ReservationSheet() {
         { time: '18:00', cols: 11 },
         { time: '18:45', cols: 11 },
         { time: '19:30', cols: 11 },
+        { time: '20:15', cols: 5 },
       ];
     }
   };
