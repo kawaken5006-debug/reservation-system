@@ -531,7 +531,7 @@
           } else {
             const customer = customerDoc.data();
             if (customer.password === formData.password) {
-              result = { success: true, customer };
+              result = { success: true, customer: { id: customerDoc.id, ...customer } }; // idを追加
             } else {
               result = { success: false, message: 'パスワードが一致しません' };
             }
@@ -541,7 +541,7 @@
             // ログイン成功 - 情報自動入力
             setFormData(prev => ({
               ...prev,
-              customerId: result.customer.id, // 明示的にIDを保持
+              customerId: result.customer.id, // ドキュメントIDを保持
               name: result.customer.name,
               phone: result.customer.phone,
               email: result.customer.email || ''
@@ -560,6 +560,7 @@
 
       const handleSubmit = async () => {
         console.log('🔵 handleSubmit開始');
+        console.log('🔍🔍🔍 formData.customerId:', formData.customerId); // 重要
         
         // 電話番号またはメールアドレスのどちらかが必須
         if (!formData.name || (!formData.phone && !formData.email) || !formData.treatment) {
@@ -573,6 +574,7 @@
         // デバッグログ追加
         console.log('🔍 デバッグ開始 ================');
         console.log('🔍 formData:', formData);
+        console.log('🔍 formData.customerId:', formData.customerId);
         console.log('🔍 formData.treatment:', formData.treatment);
         console.log('🔍 selectedMenu:', selectedMenu);
         console.log('🔍 selectedMenu?.isNewPatient:', selectedMenu?.isNewPatient);
@@ -592,6 +594,7 @@
         };
 
         console.log('🔍 bookingData:', bookingData);
+        console.log('🔍 bookingData.id:', bookingData.id);
         console.log('🔍 bookingData.isNewPatient:', bookingData.isNewPatient);
         console.log('🔍 デバッグ終了 ================');
         console.log('✅ 予約確定:', bookingData);
@@ -675,7 +678,6 @@
             <button className="nav-btn" onClick={handleNextWeek}>次の一週間 →</button>
           </div>
 
-          <div className="table-wrapper">
           <div className="table-wrapper">
             <table className="calendar-table">
               <thead>
@@ -932,7 +934,7 @@
 
               {/* Step 3-2: パスワード登録フォーム */}
               {showPasswordSetup && (
-                <form onSubmit={(e) => {
+                <form onSubmit={async (e) => {
                   e.preventDefault();
                   
                   // パスワード一致チェック
@@ -957,11 +959,59 @@
                     return;
                   }
                   
-                  // TODO: Firebase Cloud Functionsでメール送信を実装
-                  // 現在は認証スキップ
-                  console.log('認証スキップ（開発中）');
-                  alert('認証URL送信しました（開発中のため認証スキップ）');
-                  setVerificationSent(true);
+                  try {
+                    console.log('🔵 パスワード設定開始');
+                    console.log('🔍 customerId:', formData.customerId);
+                    
+                    // Firestoreの顧客ドキュメントを取得
+                    const customerDoc = await db.collection('customers').doc(formData.customerId).get();
+                    
+                    if (!customerDoc.exists) {
+                      alert('顧客IDが見つかりません');
+                      return;
+                    }
+                    
+                    const customerData = customerDoc.data();
+                    
+                    // パスワードと連絡先を更新
+                    await db.collection('customers').doc(formData.customerId).update({
+                      password: formData.password,
+                      phone: verificationMethod === 'sms' ? formData.phone : (customerData.phone || ''),
+                      email: verificationMethod === 'email' ? formData.email : (customerData.email || ''),
+                      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    console.log('✅ Firestoreにパスワード保存完了');
+                    
+                    // 更新後の顧客情報を取得してformDataに反映
+                    const updatedDoc = await db.collection('customers').doc(formData.customerId).get();
+                    const updatedCustomer = updatedDoc.data();
+                    
+                    setFormData(prev => ({
+                      ...prev,
+                      customerId: formData.customerId, // 明示的にIDを保持
+                      name: updatedCustomer.name || prev.name,
+                      phone: updatedCustomer.phone || prev.phone,
+                      email: updatedCustomer.email || prev.email
+                    }));
+                    
+                    console.log('✅ formDataに顧客情報を設定:', {
+                      customerId: formData.customerId,
+                      name: updatedCustomer.name,
+                      phone: updatedCustomer.phone,
+                      email: updatedCustomer.email
+                    });
+                    
+                    // パスワード設定完了後、予約フォームへ移動
+                    alert('パスワードを設定しました！予約を続けてください。');
+                    setShowPasswordSetup(false);
+                    setShowLoginStep(false);
+                    setShowForm(true); // 予約フォームを表示
+                    
+                  } catch (error) {
+                    console.error('❌ パスワード設定エラー:', error);
+                    alert('エラーが発生しました: ' + error.message);
+                  }
                 }} style={{marginTop: '20px'}}>
                   <h3 style={{marginBottom: '15px'}}>パスワード設定</h3>
                   

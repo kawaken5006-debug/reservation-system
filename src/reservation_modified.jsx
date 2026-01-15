@@ -47,10 +47,23 @@ export default function ReservationSheet() {
     const dayOfWeek = date.getDay(); // 0=日曜, 6=土曜
     
     if (dayOfWeek === 0) {
-      // 日曜日は休診
-      return [];
+      // 日曜日（8:30-16:45）
+      return [
+        { time: '8:30', cols: 11 },
+        { time: '9:15', cols: 11 },
+        { time: '10:00', cols: 11 },
+        { time: '10:45', cols: 11 },
+        { time: '11:30', cols: 11 },
+        { time: '12:15', cols: 11 },
+        { time: '13:00', cols: 11 },
+        { time: '13:45', cols: 11 },
+        { time: '14:30', cols: 11 },
+        { time: '15:15', cols: 11 },
+        { time: '16:00', cols: 11 },
+        { time: '16:45', cols: 5 },
+      ];
     } else if (dayOfWeek === 6) {
-      // 土曜日は昼まで（12:30まで）
+      // 土曜日（9:00-19:15）
       return [
         { time: '9:00', cols: 11 },
         { time: '9:45', cols: 11 },
@@ -58,9 +71,16 @@ export default function ReservationSheet() {
         { time: '11:15', cols: 11 },
         { time: '11:45', cols: 11 },
         { time: '12:30', cols: 5 },
+        { time: '15:00', cols: 11 },
+        { time: '15:45', cols: 11 },
+        { time: '16:30', cols: 11 },
+        { time: '17:15', cols: 11 },
+        { time: '18:00', cols: 11 },
+        { time: '18:30', cols: 11 },
+        { time: '19:15', cols: 5 },
       ];
     } else {
-      // 平日の時間枠（20:15削除）
+      // 平日（9:00-19:30）
       return [
         { time: '9:00', cols: 11 },
         { time: '9:45', cols: 11 },
