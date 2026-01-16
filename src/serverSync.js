@@ -75,7 +75,23 @@ export const saveCustomerDatabaseToServer = async (customerDb) => {
     let successCount = 0;
     for (const [customerId, customerData] of Object.entries(customerDb)) {
       const docRef = doc(db, 'customers', customerId);
-      await setDoc(docRef, customerData);
+      
+      // 既存データを取得してpasswordを保持
+      const existingDoc = await getDoc(docRef);
+      const existingData = existingDoc.exists() ? existingDoc.data() : {};
+      
+      // passwordフィールドが既存データにあれば保持、なければ新しいデータのものを使用
+      const dataToSave = {
+        ...customerData,
+        password: customerData.password || existingData.password || undefined
+      };
+      
+      // undefinedのフィールドを削除
+      if (dataToSave.password === undefined) {
+        delete dataToSave.password;
+      }
+      
+      await setDoc(docRef, dataToSave);
       successCount++;
     }
     
