@@ -76,22 +76,14 @@ export const saveCustomerDatabaseToServer = async (customerDb) => {
     for (const [customerId, customerData] of Object.entries(customerDb)) {
       const docRef = doc(db, 'customers', customerId);
       
-      // 既存データを取得してpasswordを保持
-      const existingDoc = await getDoc(docRef);
-      const existingData = existingDoc.exists() ? existingDoc.data() : {};
-      
-      // passwordフィールドが既存データにあれば保持、なければ新しいデータのものを使用
-      const dataToSave = {
-        ...customerData,
-        password: customerData.password || existingData.password || undefined
-      };
-      
-      // undefinedのフィールドを削除
-      if (dataToSave.password === undefined) {
-        delete dataToSave.password;
+      // ticketsが含まれていない場合は除外して保存
+      const dataToSave = { ...customerData };
+      if (!customerData.tickets) {
+        delete dataToSave.tickets;
       }
       
-      await setDoc(docRef, dataToSave);
+      // merge: true で既存のpasswordとticketsを保持
+      await setDoc(docRef, dataToSave, { merge: true });
       successCount++;
     }
     
@@ -152,6 +144,27 @@ export const loadStaffHolidaysFromServer = async () => {
     }
   } catch (error) {
     console.error('❌ スタッフ休み読み込みエラー:', error);
+    return {};
+  }
+};
+
+// 顧客データベースを読み込む
+export const loadCustomerDatabaseFromServer = async () => {
+  console.log('👥 顧客データをFirestoreから読み込んでいます...');
+  
+  try {
+    const customersRef = collection(db, 'customers');
+    const snapshot = await getDocs(customersRef);
+    
+    const customerDb = {};
+    snapshot.forEach((doc) => {
+      customerDb[doc.id] = doc.data();
+    });
+    
+    console.log(`✅ 顧客データ読み込み完了: ${snapshot.size}件`);
+    return customerDb;
+  } catch (error) {
+    console.error('❌ 顧客データ読み込みエラー:', error);
     return {};
   }
 };

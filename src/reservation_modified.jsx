@@ -8,6 +8,7 @@ import {
   saveStaffHolidaysToServer, 
   loadStaffHolidaysFromServer, 
   saveCustomerDatabaseToServer,
+  loadCustomerDatabaseFromServer,
   startRealtimeSync,
   stopRealtimeSync,
   markCellAsEditing
@@ -249,6 +250,15 @@ export default function ReservationSheet() {
     const init = async () => {
       try {
         console.log('🔄 初期化開始...');
+        
+        // 顧客データ読み込み
+        const customerData = await loadCustomerDatabaseFromServer();
+        if (customerData && Object.keys(customerData).length > 0) {
+          setCustomerDb(customerData);
+          console.log('✅ 顧客データ読み込み完了:', Object.keys(customerData).length, '件');
+        } else {
+          console.log('📊 顧客データは空です（ローカルデータを使用）');
+        }
         
         // 予約データ読み込み
         const data = await loadFromServer();
