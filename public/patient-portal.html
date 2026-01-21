@@ -208,6 +208,30 @@
       background: #cc0000;
     }
     
+    /* 電話ボタン */
+    .phone-btn {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #4CAF50;
+      color: white;
+      text-decoration: none;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.9;
+      transition: opacity 0.2s;
+      z-index: 10;
+    }
+    .phone-btn:hover {
+      opacity: 1;
+      background: #45a049;
+    }
+    
     /* 回数券 */
     .ticket-list {
       display: flex;
@@ -600,19 +624,21 @@
               const times = visitTimes[dateStr] || [];
               const timeText = times.join(', ') || '時間不明';
               
-              // キャンセル可能かチェック（24時間前まで）
+              // キャンセル可能かチェック（1時間前まで）
               const [h, m] = times[0].split(':');
               const visitDate = new Date(dateStr);
               visitDate.setHours(parseInt(h), parseInt(m), 0, 0);
               const now = new Date();
               const hoursDiff = (visitDate - now) / (1000 * 60 * 60);
-              const canCancel = hoursDiff > 24;
+              const canCancel = hoursDiff > 1;
+              const needsPhone = hoursDiff <= 1 && hoursDiff > 0; // 1時間以内
               
               html += `
                 <div class="stamp-cell stamped" onclick="toggleTime(this, event)" data-date="${dateStr}" data-times="${times.join(',')}">
                   <div class="stamp-date">${parseInt(month)}/${parseInt(day)}</div>
                   <div class="stamp-time">${timeText}</div>
                   ${canCancel ? `<button class="cancel-btn" onclick="cancelReservation('${dateStr}', '${times[0]}', event)" title="キャンセル">×</button>` : ''}
+                  ${needsPhone ? `<a href="tel:0923248998" class="phone-btn" title="お電話ください">📞</a>` : ''}
                 </div>`;
             } else {
               html += `<div class="stamp-cell">${i + 1}</div>`;
@@ -733,6 +759,23 @@
         
         // Firestoreを更新
         await updateDoc(reservationRef, updates);
+        
+        // キャンセル履歴に記録
+        try {
+          const { collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+          const cancellationsRef = collection(db, 'cancellations');
+          await addDoc(cancellationsRef, {
+            customerId: currentUser.id,
+            customerName: currentUser.name,
+            reservationDate: dateStr,
+            reservationTime: timeStr,
+            cancelledAt: serverTimestamp(),
+            cancelledBy: 'patient' // 患者自身がキャンセル
+          });
+        } catch (error) {
+          console.error('キャンセル履歴の記録エラー:', error);
+          // 記録失敗してもキャンセル自体は成功とする
+        }
         
         alert('予約をキャンセルしました');
         
