@@ -5,81 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>マイページ - リハキュア</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-family: Arial, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
       padding: 20px;
     }
-
     .container {
       background: white;
       border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-      max-width: 900px;
-      width: 100%;
-      overflow: hidden;
-    }
-
-    .login-screen {
-      padding: 40px;
-    }
-
-    .login-header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    .login-header h1 {
-      font-size: 28px;
-      color: #333;
-      margin-bottom: 10px;
-    }
-
-    .login-header p {
-      color: #666;
-      font-size: 14px;
-    }
-
-    .login-form {
-      max-width: 400px;
+      padding: 30px;
+      max-width: 1200px;
       margin: 0 auto;
     }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    .form-group label {
-      display: block;
-      margin-bottom: 8px;
-      color: #333;
-      font-weight: 600;
-    }
-
+    
+    /* ログイン画面 */
+    .login-screen { display: block; }
+    .login-screen.hidden { display: none; }
+    .main-content { display: none; }
+    .main-content.active { display: block; }
+    
+    .login-header { text-align: center; margin-bottom: 30px; }
+    .login-header h1 { font-size: 28px; color: #333; margin-bottom: 10px; }
+    .login-header p { color: #666; font-size: 14px; }
+    
+    .login-form { max-width: 400px; margin: 0 auto; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; color: #333; font-weight: 600; }
     .form-group input {
       width: 100%;
       padding: 12px 15px;
       border: 2px solid #e0e0e0;
       border-radius: 10px;
       font-size: 16px;
-      transition: border-color 0.3s;
     }
-
-    .form-group input:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
+    .form-group input:focus { outline: none; border-color: #667eea; }
+    
     .btn {
       width: 100%;
       padding: 15px;
@@ -88,277 +50,282 @@
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
       margin-bottom: 15px;
     }
-
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-    }
-
-    .btn-primary {
-      background: #667eea;
-      color: white;
-    }
-
-    .btn-secondary {
-      background: #9b59b6;
-      color: white;
-    }
-
-    .btn-link {
-      background: transparent;
-      color: #667eea;
-      text-decoration: underline;
-      padding: 10px;
-    }
-
-    .error-message {
-      background: #fee;
-      color: #c33;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 14px;
-    }
-
-    .password-setup {
-      padding: 40px;
-    }
-
-    .password-setup h2 {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #333;
-    }
-
-    .mypage {
-      display: none;
-    }
-
-    .mypage-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 30px;
-      text-align: center;
-      position: relative;
-    }
-
-    .mypage-header h1 {
-      font-size: 24px;
-      margin-bottom: 10px;
-    }
-
-    .mypage-header p {
-      opacity: 0.9;
-    }
-
+    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .btn-secondary { background: #f0f0f0; color: #333; }
+    .error-message { color: #f44336; font-size: 14px; margin-top: 10px; text-align: center; }
+    
+    /* メインコンテンツ */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    h2 { color: #333; }
+    .user-info { font-size: 14px; color: #666; }
     .logout-btn {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: rgba(255,255,255,0.2);
-      color: white;
+      padding: 8px 16px;
+      background: #f0f0f0;
       border: none;
-      padding: 8px 20px;
-      border-radius: 20px;
+      border-radius: 6px;
       cursor: pointer;
       font-size: 14px;
     }
-
-    .mypage-content {
-      padding: 30px;
-    }
-
-    .section {
-      margin-bottom: 40px;
-    }
-
-    .section-title {
-      font-size: 20px;
-      color: #333;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #667eea;
-    }
-
-    .booking-grid {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .booking-cell {
-      aspect-ratio: 1;
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
+    
+    .tabs {
       display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 5px;
-      font-size: 12px;
+      gap: 10px;
+      border-bottom: 2px solid #e0e0e0;
+      margin-bottom: 20px;
     }
-
-    .booking-cell.booked {
+    .tab {
+      padding: 10px 20px;
+      border: none;
+      background: none;
+      color: #666;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+    }
+    .tab.active { color: #667eea; border-bottom-color: #667eea; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    
+    /* 診察券 */
+    .card-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .診察card {
+      width: 8cm;
+      height: 5cm;
+      background: white;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .診察card-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      border-color: #667eea;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 35px;
     }
-
-    .booking-cell .date {
-      font-weight: 600;
-      margin-bottom: 5px;
-    }
-
-    .booking-cell .time {
-      font-size: 10px;
-      opacity: 0.8;
-    }
-
-    .ticket-grid {
+    .診察card-title { font-size: 12px; font-weight: 600; }
+    .診察card-number { font-size: 10px; }
+    .診察card-body { padding: 6px; height: calc(5cm - 35px); }
+    .stamp-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(6, 1fr);
+      grid-auto-rows: 1fr;
+      gap: 0;
+      border: 1px solid #ddd;
+      height: 100%;
     }
-
-    .ticket-card {
-      background: #f8f9fa;
-      border-radius: 15px;
-      padding: 20px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-
-    .ticket-name {
-      font-size: 18px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 10px;
-    }
-
-    .ticket-count {
-      font-size: 32px;
-      font-weight: 700;
-      color: #667eea;
-      text-align: center;
-      margin: 15px 0;
-    }
-
-    .ticket-count span {
-      font-size: 14px;
-      color: #666;
-    }
-
-    .ticket-usage {
+    .stamp-cell {
+      border: 0.5px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
       font-size: 12px;
-      color: #666;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #ddd;
-    }
-
-    .no-data {
-      text-align: center;
       color: #999;
-      padding: 40px;
+      position: relative;
+      cursor: default;
+      overflow: visible;
+    }
+    .stamp-cell.stamped {
+      background: linear-gradient(135deg, #667eea20, #764ba220);
+      color: #667eea;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .stamp-cell.stamped:hover {
+      background: linear-gradient(135deg, #667eea30, #764ba230);
+    }
+    .stamp-cell.stamped.active {
+      background: linear-gradient(135deg, #667eea40, #764ba240);
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* 日付と時間 */
+    .stamp-date {
+      transition: transform 0.3s ease;
+    }
+    .stamp-time {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      font-size: 11px;
+      padding: 6px 2px;
+      border-radius: 0 0 4px 4px;
+      opacity: 0;
+      transform: translateY(-100%);
+      transition: all 0.3s ease;
+      pointer-events: none;
+      z-index: 100;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stamp-cell.stamped.active .stamp-date {
+      transform: translateY(-4px);
+    }
+    .stamp-cell.stamped.active .stamp-time {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    /* キャンセルボタン */
+    .cancel-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ff4444;
+      color: white;
+      border: none;
+      cursor: pointer;
       font-size: 14px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0.8;
+      transition: opacity 0.2s;
+      z-index: 10;
     }
-
-    @media (max-width: 768px) {
-      .booking-grid {
-        grid-template-columns: repeat(4, 1fr);
-      }
-      
-      .mypage-header {
-        position: relative;
-      }
-      
-      .logout-btn {
-        position: static;
-        margin-top: 15px;
-        display: block;
-        width: fit-content;
-        margin-left: auto;
-        margin-right: auto;
-      }
+    .cancel-btn:hover {
+      opacity: 1;
+      background: #cc0000;
     }
+    
+    /* 回数券 */
+    .ticket-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .ticket-card {
+      width: 8cm;
+      height: 5cm;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .ticket-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 30px;
+    }
+    .ticket-name { font-size: 11px; font-weight: 600; }
+    .ticket-info { font-size: 8px; display: flex; gap: 8px; }
+    .ticket-body { padding: 6px; height: calc(5cm - 30px); }
+    
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-auto-rows: 1fr;
+      gap: 0;
+      border: 1px solid #ddd;
+      height: 100%;
+    }
+    .grid-6 {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-auto-rows: 1fr;
+      gap: 0;
+      border: 1px solid #ddd;
+      height: 100%;
+    }
+    .grid-8 {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-auto-rows: 1fr;
+      gap: 0;
+      border: 1px solid #ddd;
+      height: 100%;
+    }
+    
+    .cell {
+      border: 0.5px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .cell.used { background: #f0f0f0; }
+    .no-data { text-align: center; color: #999; padding: 40px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="login-screen" id="loginScreen">
+    <!-- ログイン画面 -->
+    <div id="loginScreen" class="login-screen">
       <div class="login-header">
-        <h1>🏥 マイページログイン</h1>
-        <p>予約・回数券の確認ができます</p>
+        <h1>🏥 リハキュア マイページ</h1>
+        <p>顧客IDとパスワードでログインしてください</p>
       </div>
-
-      <div id="errorMessage" class="error-message" style="display: none;"></div>
-
-      <div class="login-form">
-        <form id="loginForm">
-          <div class="form-group">
-            <label for="customerId">顧客ID</label>
-            <input type="text" id="customerId" placeholder="12345" required>
-          </div>
-          <div class="form-group">
-            <label for="password">パスワード</label>
-            <input type="password" id="password" placeholder="パスワード" required>
-          </div>
-          <button type="submit" class="btn btn-primary">ログイン</button>
-        </form>
-        <button class="btn btn-secondary" id="showPasswordSetup">パスワード未登録の方</button>
-      </div>
-    </div>
-
-    <div class="password-setup" id="passwordSetupScreen" style="display: none;">
-      <h2>🔐 パスワード設定</h2>
-      
-      <div id="setupErrorMessage" class="error-message" style="display: none;"></div>
-      
-      <form id="passwordSetupForm" class="login-form">
+      <form id="loginForm" class="login-form">
         <div class="form-group">
-          <label for="setupCustomerId">顧客ID</label>
-          <input type="text" id="setupCustomerId" placeholder="12345" required>
+          <label>顧客ID</label>
+          <input type="text" id="customerId" required>
         </div>
         <div class="form-group">
-          <label for="newPassword">新しいパスワード</label>
-          <input type="password" id="newPassword" placeholder="8文字以上" required minlength="8">
+          <label>パスワード</label>
+          <input type="password" id="password" required>
         </div>
-        <div class="form-group">
-          <label for="confirmPassword">パスワード確認</label>
-          <input type="password" id="confirmPassword" placeholder="もう一度入力" required>
-        </div>
-        <button type="submit" class="btn btn-primary">パスワード設定</button>
-        <button type="button" class="btn btn-link" id="backToLogin">← ログイン画面に戻る</button>
+        <button type="submit" class="btn btn-primary">ログイン</button>
+        <div id="errorMessage" class="error-message"></div>
       </form>
     </div>
 
-    <div class="mypage" id="mypage">
-      <div class="mypage-header">
-        <button class="logout-btn" id="logoutBtn">ログアウト</button>
-        <h1>マイページ</h1>
-        <p id="userName"></p>
+    <!-- メインコンテンツ -->
+    <div id="mainContent" class="main-content">
+      <div class="header">
+        <div>
+          <h2>マイページ</h2>
+          <div class="user-info" id="userInfo"></div>
+        </div>
+        <button class="logout-btn" onclick="logout()">ログアウト</button>
       </div>
 
-      <div class="mypage-content">
-        <div class="section">
-          <h2 class="section-title">📅 今後の予約（最大24件）</h2>
-          <div class="booking-grid" id="bookingGrid"></div>
-        </div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('cards')">診察券</button>
+        <button class="tab" onclick="switchTab('tickets')">回数券</button>
+      </div>
 
-        <div class="section">
-          <h2 class="section-title">🎫 回数券</h2>
-          <div class="ticket-grid" id="ticketGrid"></div>
-        </div>
+      <!-- 診察券タブ -->
+      <div class="tab-content active" id="tab-cards">
+        <div class="card-list" id="cardList"></div>
+      </div>
+
+      <!-- 回数券タブ -->
+      <div class="tab-content" id="tab-tickets">
+        <div class="ticket-list" id="ticketList"></div>
       </div>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-    import { getFirestore, collection, getDocs, doc, getDoc, setDoc, query, where, limit } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyDNWom7ao2r37n76RaXpPo5vV0DnW-XLtw",
@@ -371,14 +338,35 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    
-    // デバッグ用にグローバル公開
-    window.debugDb = db;
-    window.debugGetDocs = getDocs;
-    window.debugCollection = collection;
-
     let currentUser = null;
 
+    // ページ読み込み時にログイン状態を復元
+    window.addEventListener('DOMContentLoaded', async () => {
+      const savedUserId = localStorage.getItem('patientPortalUserId');
+      if (savedUserId) {
+        try {
+          const customerDoc = await getDoc(doc(db, 'customers', savedUserId));
+          if (customerDoc.exists()) {
+            currentUser = { id: savedUserId, ...customerDoc.data() };
+            
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainContent').classList.add('active');
+            document.getElementById('userInfo').textContent = `${currentUser.name} 様（ID: ${currentUser.id}）`;
+            
+            loadCards();
+            loadTickets();
+          } else {
+            // ユーザーが存在しない場合はクリア
+            localStorage.removeItem('patientPortalUserId');
+          }
+        } catch (error) {
+          console.error('自動ログインエラー:', error);
+          localStorage.removeItem('patientPortalUserId');
+        }
+      }
+    });
+
+    // ログイン処理
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -401,243 +389,358 @@
         }
 
         currentUser = { id: customerId, ...customerData };
-        showMypage();
+        
+        // ログイン状態を保存
+        localStorage.setItem('patientPortalUserId', customerId);
+        
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('mainContent').classList.add('active');
+        document.getElementById('userInfo').textContent = `${currentUser.name} 様（ID: ${currentUser.id}）`;
+        
+        loadCards();
+        loadTickets();
         
       } catch (error) {
         console.error('ログインエラー:', error);
-        showError('ログインに失敗しました');
+        showError('エラーが発生しました');
       }
     });
 
-    document.getElementById('showPasswordSetup').addEventListener('click', () => {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('passwordSetupScreen').style.display = 'block';
-    });
-
-    document.getElementById('backToLogin').addEventListener('click', () => {
-      document.getElementById('loginScreen').style.display = 'block';
-      document.getElementById('passwordSetupScreen').style.display = 'none';
-    });
-
-    document.getElementById('passwordSetupForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const customerId = document.getElementById('setupCustomerId').value.trim();
-      const newPassword = document.getElementById('newPassword').value;
-      const confirmPassword = document.getElementById('confirmPassword').value;
-
-      if (newPassword !== confirmPassword) {
-        showError('パスワードが一致しません', 'setupErrorMessage');
-        return;
-      }
-
-      if (newPassword.length < 8) {
-        showError('パスワードは8文字以上で入力してください', 'setupErrorMessage');
-        return;
-      }
-
-      try {
-        const customerDoc = await getDoc(doc(db, 'customers', customerId));
-        
-        if (!customerDoc.exists()) {
-          showError('顧客IDが見つかりません', 'setupErrorMessage');
-          return;
-        }
-
-        await setDoc(doc(db, 'customers', customerId), {
-          password: newPassword
-        }, { merge: true });
-
-        alert('パスワードを設定しました！\nログイン画面からログインしてください。');
-        
-        document.getElementById('loginScreen').style.display = 'block';
-        document.getElementById('passwordSetupScreen').style.display = 'none';
-        document.getElementById('passwordSetupForm').reset();
-        
-      } catch (error) {
-        console.error('パスワード設定エラー:', error);
-        showError('パスワード設定に失敗しました', 'setupErrorMessage');
-      }
-    });
-
-    async function showMypage() {
-      document.getElementById('loginScreen').style.display = 'none';
-      document.getElementById('mypage').style.display = 'block';
-      
-      document.getElementById('userName').textContent = `${currentUser.name} 様（ID: ${currentUser.id}）`;
-      
-      await loadBookings();
-      loadTickets();
+    function showError(message) {
+      document.getElementById('errorMessage').textContent = message;
     }
 
-    async function loadBookings() {
-      const bookingGrid = document.getElementById('bookingGrid');
-      bookingGrid.innerHTML = '<div class="no-data">読み込み中...</div>';
-
-      try {
-        console.log('📅 予約データ読み込み開始...');
-        const userBookings = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split('T')[0];
-
-        // 1. reservationsコレクションから取得（管理画面で手動入力した予約）
-        console.log('📊 reservations取得中...');
-        const reservationsSnapshot = await getDocs(collection(db, 'reservations'));
-        console.log(`✅ reservations取得完了: ${reservationsSnapshot.size}件`);
+    window.logout = function() {
+      currentUser = null;
+      localStorage.removeItem('patientPortalUserId');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('mainContent').classList.remove('active');
+      document.getElementById('loginForm').reset();
+      document.getElementById('errorMessage').textContent = '';
+    }
+    
+    // デバッグ関数
+    window.debugReservations = async function() {
+      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+      const snapshot = await getDocs(collection(db, 'reservations'));
+      const doc2026 = Array.from(snapshot.docs).find(d => d.id.startsWith('2026-01'));
+      if (doc2026) {
+        console.log('📅 日付:', doc2026.id);
+        const data = doc2026.data();
+        const keys = Object.keys(data);
+        console.log('🔑 全キー数:', keys.length);
+        console.log('🔑 最初の20キー:', keys.slice(0, 20));
         
-        reservationsSnapshot.forEach(docSnap => {
-          const dateKey = docSnap.id;
-          const dateData = docSnap.data();
-          
-          const bookingDate = new Date(dateKey);
-          if (bookingDate < today) return;
+        // memoTextsを確認
+        if (data.memoTexts) {
+          console.log('📝 memoTexts:', data.memoTexts);
+        }
+        
+        // nameキーを確認
+        const nameKeys = keys.filter(k => k.includes('name'));
+        console.log('👤 nameキー:', nameKeys.slice(0, 5));
+        nameKeys.slice(0, 3).forEach(k => {
+          console.log(`  ${k}:`, data[k]);
+        });
+      }
+    }
 
-          console.log(`📄 ${dateKey}: data=${dateData.data ? 'あり' : 'なし'}, keys=${dateData.data ? Object.keys(dateData.data).length : 0}`);
+    window.switchTab = function(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+    }
+    
+    // 時間表示のトグル
+    window.toggleTime = function(element, event) {
+      event.stopPropagation();
+      
+      // 他のアクティブなセルを閉じる
+      document.querySelectorAll('.stamp-cell.active').forEach(cell => {
+        if (cell !== element) {
+          cell.classList.remove('active');
+        }
+      });
+      
+      // このセルをトグル
+      element.classList.toggle('active');
+    }
+
+    // 診察券読み込み
+    async function loadCards() {
+      const cardList = document.getElementById('cardList');
+      
+      console.log('🔍 診察券読み込み開始');
+      console.log('👤 currentUser:', currentUser);
+      console.log('🆔 currentUser.id:', currentUser.id, typeof currentUser.id);
+      console.log('📛 currentUser.name:', currentUser.name);
+      
+      try {
+        // Firestoreのreservationsから顧客の予約を取得
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        
+        const reservationsRef = collection(db, 'reservations');
+        const snapshot = await getDocs(reservationsRef);
+        
+        console.log('📊 取得したドキュメント数:', snapshot.size);
+        
+        const visits = [];
+        const visitTimes = {}; // 日付ごとの時間を保存
+        
+        // 全日付の予約データから顧客IDに一致するものを抽出
+        snapshot.forEach((docSnapshot) => {
+          const dateData = docSnapshot.data();
+          const dateKey = docSnapshot.id; // 例: "2026-01-16"
           
-          if (dateData.data) {
-            Object.keys(dateData.data).forEach(key => {
-              if (key.endsWith('-id')) {
-                const idValue = dateData.data[key]?.id;
-                console.log(`🔍 ${dateKey} ${key}: Firestore="${idValue}" (${typeof idValue}), currentUser="${currentUser.id}" (${typeof currentUser.id}), match=${idValue === currentUser.id}`);
-                
-                if (idValue === currentUser.id) {
-                  const match = key.match(/^(.+)-(\d+)-id$/);
-                  if (match) {
-                    const time = match[1];
-                    const col = match[2];
-                    const nameKey = `${time}-${col}-name`;
-                    const name = dateData.data[nameKey]?.name || '';
-                    
-                    userBookings.push({
-                      date: dateKey,
-                      time: time,
-                      name: name,
-                      source: 'manual'
-                    });
+          // 2026-01-16を詳細デバッグ
+          if (dateKey === '2026-01-16') {
+            console.log(`🔍 詳細デバッグ: ${dateKey}`);
+            const allKeys = Object.keys(dateData);
+            console.log(`  全キー数: ${allKeys.length}件`);
+            console.log(`  全キー:`, allKeys);
+            
+            // dataキーの中身を確認
+            if (dateData.data) {
+              console.log(`  📦 data内のキー:`, Object.keys(dateData.data).slice(0, 30));
+              const dataKeys = Object.keys(dateData.data);
+              const idKeys = dataKeys.filter(k => k.endsWith('-id'));
+              const nameKeys = dataKeys.filter(k => k.endsWith('-name'));
+              console.log(`  IDキー: ${idKeys.length}件`, idKeys.slice(0, 5));
+              console.log(`  nameキー: ${nameKeys.length}件`, nameKeys.slice(0, 5));
+              
+              if (idKeys.length > 0) {
+                console.log(`    ${idKeys[0]}:`, dateData.data[idKeys[0]]);
+              }
+              if (nameKeys.length > 0) {
+                console.log(`    ${nameKeys[0]}:`, dateData.data[nameKeys[0]]);
+              }
+            }
+          }
+          
+          // その日の予約データを取得（dataキーの中にある）
+          const dayData = dateData.data || {};
+          
+          // その日の全予約枠をチェック
+          Object.keys(dayData).forEach(key => {
+            // IDを確認: "9:00-0-id" の値は {id: "10"}
+            if (key.endsWith('-id')) {
+              const idObj = dayData[key];
+              if (typeof idObj === 'object' && idObj?.id === currentUser.id) {
+                console.log(`✅ ID一致！日付追加: ${dateKey} (${key}: ${idObj.id})`);
+                if (!visits.includes(dateKey)) {
+                  visits.push(dateKey);
+                  // 時間を抽出: "9:00-0-id" → "9:00"
+                  const timeMatch = key.match(/^(\d{1,2}:\d{2})-/);
+                  if (timeMatch) {
+                    if (!visitTimes[dateKey]) visitTimes[dateKey] = [];
+                    visitTimes[dateKey].push(timeMatch[1]);
                   }
                 }
               }
-            });
-          }
-        });
-        console.log(`✅ reservationsから: ${userBookings.length}件`);
-
-        // 2. webBookingsコレクションから取得（ネット予約）
-        console.log('📊 webBookings取得中...');
-        const webBookingsSnapshot = await getDocs(collection(db, 'webBookings'));
-        console.log(`✅ webBookings取得完了: ${webBookingsSnapshot.size}件`);
-        
-        webBookingsSnapshot.forEach(docSnap => {
-          const booking = docSnap.data();
-          
-          // 自分のIDの予約のみ
-          if (booking.id !== currentUser.id) return;
-          
-          const bookingDate = new Date(booking.date);
-          if (bookingDate < today) return;
-          
-          userBookings.push({
-            date: booking.date,
-            time: booking.time,
-            name: booking.name,
-            source: 'web'
+            }
+            
+            // 名前を確認: "9:00-0-name" の値は {name: "古藤 宗利"}
+            if (key.endsWith('-name')) {
+              const nameObj = dayData[key];
+              if (typeof nameObj === 'object' && nameObj?.name) {
+                // 空白を正規化して比較（全角スペース・半角スペース対応）
+                const normalizedName = nameObj.name.replace(/\s+/g, '');
+                const normalizedUserName = currentUser.name.replace(/\s+/g, '');
+                
+                if (dateKey === '2026-01-16') {
+                  console.log(`👤 ${key}: 名前="${nameObj.name}" (正規化:${normalizedName}) vs "${currentUser.name}" (正規化:${normalizedUserName}) 一致:${normalizedName === normalizedUserName}`);
+                }
+                
+                if (normalizedName === normalizedUserName) {
+                  console.log(`✅ 名前一致！日付追加: ${dateKey}`);
+                  if (!visits.includes(dateKey)) {
+                    visits.push(dateKey);
+                    // 時間を抽出
+                    const timeMatch = key.match(/^(\d{1,2}:\d{2})-/);
+                    if (timeMatch) {
+                      if (!visitTimes[dateKey]) visitTimes[dateKey] = [];
+                      visitTimes[dateKey].push(timeMatch[1]);
+                    }
+                  }
+                }
+              }
+            }
           });
         });
-        console.log(`✅ webBookingsから: ${userBookings.filter(b => b.source === 'web').length}件`);
-        console.log(`✅ 合計: ${userBookings.length}件`);
-
-        // 日付順にソート
-        userBookings.sort((a, b) => {
-          if (a.date !== b.date) return a.date.localeCompare(b.date);
-          return a.time.localeCompare(b.time);
-        });
-
-        // 最大24件まで表示
-        const displayBookings = userBookings.slice(0, 24);
-
-        bookingGrid.innerHTML = '';
-
-        if (displayBookings.length === 0) {
-          bookingGrid.innerHTML = '<div class="no-data">予約がありません</div>';
-          return;
-        }
-
-        displayBookings.forEach(booking => {
-          const cell = document.createElement('div');
-          cell.className = 'booking-cell booked';
+        
+        // 日付でソート
+        visits.sort();
+        
+        console.log('📅 最終的な予約日付:', visits);
+        
+        // 24枠ごとに診察券を分割
+        const cardsNeeded = Math.ceil(visits.length / 24) || 1;
+        
+        let html = '';
+        for (let cardNum = 0; cardNum < cardsNeeded; cardNum++) {
+          const startIndex = cardNum * 24;
+          const endIndex = Math.min(startIndex + 24, visits.length);
+          const cardVisits = visits.slice(startIndex, endIndex);
           
-          const dateObj = new Date(booking.date);
-          const month = dateObj.getMonth() + 1;
-          const day = dateObj.getDate();
-          
-          cell.innerHTML = `
-            <div class="date">${month}/${day}</div>
-            <div class="time">${booking.time}</div>
+          html += `
+            <div class="診察card">
+              <div class="診察card-header">
+                <div class="診察card-title">診察券 ${cardNum + 1}</div>
+                <div class="診察card-number">${cardVisits.length}/24</div>
+              </div>
+              <div class="診察card-body">
+                <div class="stamp-grid">
           `;
           
-          bookingGrid.appendChild(cell);
-        });
-
-        // 残りを空セルで埋める
-        const emptyCount = 24 - displayBookings.length;
-        for (let i = 0; i < emptyCount; i++) {
-          const cell = document.createElement('div');
-          cell.className = 'booking-cell';
-          cell.innerHTML = '<div class="date">-</div>';
-          bookingGrid.appendChild(cell);
+          for (let i = 0; i < 24; i++) {
+            if (i < cardVisits.length) {
+              const dateStr = cardVisits[i]; // "2026-01-16"
+              const [year, month, day] = dateStr.split('-');
+              const times = visitTimes[dateStr] || [];
+              const timeText = times.join(', ') || '時間不明';
+              
+              // キャンセル可能かチェック（24時間前まで）
+              const visitDate = new Date(dateStr + 'T' + times[0] + ':00');
+              const now = new Date();
+              const hoursDiff = (visitDate - now) / (1000 * 60 * 60);
+              const canCancel = hoursDiff > 24;
+              
+              html += `
+                <div class="stamp-cell stamped" onclick="toggleTime(this, event)" data-date="${dateStr}" data-times="${times.join(',')}">
+                  <div class="stamp-date">${parseInt(month)}/${parseInt(day)}</div>
+                  <div class="stamp-time">${timeText}</div>
+                  ${canCancel ? `<button class="cancel-btn" onclick="cancelReservation('${dateStr}', '${times[0]}', event)" title="キャンセル">×</button>` : ''}
+                </div>`;
+            } else {
+              html += `<div class="stamp-cell">${i + 1}</div>`;
+            }
+          }
+          
+          html += `
+                </div>
+              </div>
+            </div>
+          `;
         }
-
+        
+        cardList.innerHTML = html || '<div class="no-data">予約がありません</div>';
+        
       } catch (error) {
-        console.error('予約読み込みエラー:', error);
-        bookingGrid.innerHTML = '<div class="no-data">予約の読み込みに失敗しました</div>';
+        console.error('診察券読み込みエラー:', error);
+        cardList.innerHTML = '<div class="no-data">診察券の読み込みに失敗しました</div>';
       }
     }
 
+    // 回数券読み込み
     function loadTickets() {
-      const ticketGrid = document.getElementById('ticketGrid');
-      ticketGrid.innerHTML = '';
-
-      if (!currentUser.tickets || currentUser.tickets.length === 0) {
-        ticketGrid.innerHTML = '<div class="no-data">回数券がありません</div>';
+      const ticketList = document.getElementById('ticketList');
+      const tickets = currentUser.tickets || [];
+      
+      if (tickets.length === 0) {
+        ticketList.innerHTML = '<div class="no-data">回数券がありません</div>';
         return;
       }
-
-      currentUser.tickets.forEach(ticket => {
-        const remaining = ticket.count - (ticket.used?.length || 0);
+      
+      let html = '';
+      tickets.slice(0, 3).forEach(ticket => {
+        const usedCount = ticket.used?.length || 0;
+        const remaining = ticket.count - usedCount;
         
-        const card = document.createElement('div');
-        card.className = 'ticket-card';
+        // 列数を決定
+        let gridClass = 'grid-4';
+        if (ticket.count > 30) gridClass = 'grid-8';
+        else if (ticket.count > 16) gridClass = 'grid-6';
         
-        card.innerHTML = `
-          <div class="ticket-name">${ticket.name}</div>
-          <div class="ticket-count">
-            残り <strong>${remaining}</strong> <span>/ ${ticket.count}回</span>
-          </div>
-          <div class="ticket-usage">
-            使用済み: ${ticket.used?.length || 0}回
-          </div>
+        html += `
+          <div class="ticket-card">
+            <div class="ticket-header">
+              <div class="ticket-name">${ticket.name} ${ticket.count}回券</div>
+              <div class="ticket-info">
+                <span>残り:${remaining}回</span>
+                <span>使用済み:${usedCount}回</span>
+              </div>
+            </div>
+            <div class="ticket-body">
+              <div class="${gridClass}">
         `;
         
-        ticketGrid.appendChild(card);
+        for (let i = 0; i < ticket.count; i++) {
+          if (i < usedCount && ticket.used[i]) {
+            const date = new Date(ticket.used[i]);
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            html += `<div class="cell used">${month}/${day}</div>`;
+          } else {
+            html += `<div class="cell">${i + 1}</div>`;
+          }
+        }
+        
+        html += `
+              </div>
+            </div>
+          </div>
+        `;
       });
-    }
-
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      currentUser = null;
-      document.getElementById('mypage').style.display = 'none';
-      document.getElementById('loginScreen').style.display = 'block';
-      document.getElementById('loginForm').reset();
-    });
-
-    function showError(message, elementId = 'errorMessage') {
-      const errorElement = document.getElementById(elementId);
-      errorElement.textContent = message;
-      errorElement.style.display = 'block';
       
-      setTimeout(() => {
-        errorElement.style.display = 'none';
-      }, 5000);
+      ticketList.innerHTML = html;
+    }
+    
+    // 予約キャンセル機能
+    window.cancelReservation = async function(dateStr, timeStr, event) {
+      event.stopPropagation(); // toggleTimeが発火しないように
+      
+      if (!confirm(`${dateStr} ${timeStr}の予約をキャンセルしますか？`)) {
+        return;
+      }
+      
+      try {
+        const { collection, doc, getDoc, updateDoc, deleteField } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        
+        // Firestoreから該当の予約を削除
+        const reservationRef = doc(db, 'reservations', dateStr);
+        const reservationDoc = await getDoc(reservationRef);
+        
+        if (!reservationDoc.exists()) {
+          alert('予約データが見つかりませんでした');
+          return;
+        }
+        
+        const data = reservationDoc.data();
+        const dayData = data.data || {};
+        
+        // 該当時間の予約を探して削除
+        const updates = {};
+        Object.keys(dayData).forEach(key => {
+          if (key.startsWith(timeStr)) {
+            const idKey = key.endsWith('-id') ? key : `${key}-id`;
+            const nameKey = key.endsWith('-name') ? key : key.replace('-id', '-name');
+            
+            // このキーが現在のユーザーの予約か確認
+            if (dayData[idKey]?.id == currentUser.id) {
+              updates[`data.${idKey}`] = deleteField();
+              updates[`data.${nameKey}`] = deleteField();
+            }
+          }
+        });
+        
+        if (Object.keys(updates).length === 0) {
+          alert('該当する予約が見つかりませんでした');
+          return;
+        }
+        
+        // Firestoreを更新
+        await updateDoc(reservationRef, updates);
+        
+        alert('予約をキャンセルしました');
+        
+        // 診察券を再読み込み
+        await loadCards();
+        
+      } catch (error) {
+        console.error('キャンセルエラー:', error);
+        alert('キャンセルに失敗しました: ' + error.message);
+      }
     }
   </script>
 </body>
