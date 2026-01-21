@@ -601,7 +601,9 @@
               const timeText = times.join(', ') || '時間不明';
               
               // キャンセル可能かチェック（24時間前まで）
-              const visitDate = new Date(dateStr + 'T' + times[0] + ':00');
+              const [h, m] = times[0].split(':');
+              const visitDate = new Date(dateStr);
+              visitDate.setHours(parseInt(h), parseInt(m), 0, 0);
               const now = new Date();
               const hoursDiff = (visitDate - now) / (1000 * 60 * 60);
               const canCancel = hoursDiff > 24;
