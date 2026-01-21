@@ -714,7 +714,7 @@
       ticketList.innerHTML = html;
     }
     
-    // 予約キャンセル機能
+    // 予約キャンセル機能（楽観的ロック付き）
     window.cancelReservation = async function(dateStr, timeStr, event) {
       event.stopPropagation(); // toggleTimeが発火しないように
       
@@ -722,69 +722,84 @@
         return;
       }
       
-      try {
-        const { collection, doc, getDoc, updateDoc, deleteField } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-        
-        // Firestoreから該当の予約を削除
-        const reservationRef = doc(db, 'reservations', dateStr);
-        const reservationDoc = await getDoc(reservationRef);
-        
-        if (!reservationDoc.exists()) {
-          alert('予約データが見つかりませんでした');
-          return;
-        }
-        
-        const data = reservationDoc.data();
-        const dayData = data.data || {};
-        
-        // 該当時間の予約を探して削除
-        const updates = {};
-        Object.keys(dayData).forEach(key => {
-          if (key.startsWith(timeStr)) {
-            const idKey = key.endsWith('-id') ? key : `${key}-id`;
-            const nameKey = key.endsWith('-name') ? key : key.replace('-id', '-name');
-            
-            // このキーが現在のユーザーの予約か確認
-            if (dayData[idKey]?.id == currentUser.id) {
-              updates[`data.${idKey}`] = deleteField();
-              updates[`data.${nameKey}`] = deleteField();
-            }
-          }
-        });
-        
-        if (Object.keys(updates).length === 0) {
-          alert('該当する予約が見つかりませんでした');
-          return;
-        }
-        
-        // Firestoreを更新
-        await updateDoc(reservationRef, updates);
-        
-        // キャンセル履歴に記録
+      const maxRetries = 3;
+      let attempt = 0;
+      
+      while (attempt < maxRetries) {
         try {
-          const { collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-          const cancellationsRef = collection(db, 'cancellations');
-          await addDoc(cancellationsRef, {
-            customerId: currentUser.id,
-            customerName: currentUser.name,
-            reservationDate: dateStr,
-            reservationTime: timeStr,
-            cancelledAt: serverTimestamp(),
-            cancelledBy: 'patient' // 患者自身がキャンセル
+          const { collection, doc, getDoc, updateDoc, deleteField, runTransaction } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+          
+          // トランザクションで実行（競合を自動解決）
+          await runTransaction(db, async (transaction) => {
+            const reservationRef = doc(db, 'reservations', dateStr);
+            const reservationDoc = await transaction.get(reservationRef);
+            
+            if (!reservationDoc.exists()) {
+              throw new Error('予約データが見つかりませんでした');
+            }
+            
+            const data = reservationDoc.data();
+            const dayData = data.data || {};
+            
+            // 該当時間の予約を探して削除
+            const updates = {};
+            let found = false;
+            
+            Object.keys(dayData).forEach(key => {
+              if (key.startsWith(timeStr)) {
+                const idKey = key.endsWith('-id') ? key : `${key}-id`;
+                const nameKey = key.endsWith('-name') ? key : key.replace('-id', '-name');
+                
+                // このキーが現在のユーザーの予約か確認
+                if (dayData[idKey]?.id == currentUser.id) {
+                  updates[`data.${idKey}`] = deleteField();
+                  updates[`data.${nameKey}`] = deleteField();
+                  found = true;
+                }
+              }
+            });
+            
+            if (!found) {
+              throw new Error('該当する予約が見つかりませんでした');
+            }
+            
+            // トランザクション内で更新
+            transaction.update(reservationRef, updates);
+            
+            // キャンセル履歴に記録
+            const cancellationsRef = doc(collection(db, 'cancellations'));
+            const { serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            transaction.set(cancellationsRef, {
+              customerId: currentUser.id,
+              customerName: currentUser.name,
+              reservationDate: dateStr,
+              reservationTime: timeStr,
+              cancelledAt: serverTimestamp(),
+              cancelledBy: 'patient'
+            });
           });
+          
+          // 成功
+          alert('予約をキャンセルしました');
+          
+          // 2秒待ってから診察券を再読み込み（Firestoreの伝播を待つ）
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await loadCards();
+          
+          return; // 成功したのでリトライループを抜ける
+          
         } catch (error) {
-          console.error('キャンセル履歴の記録エラー:', error);
-          // 記録失敗してもキャンセル自体は成功とする
+          attempt++;
+          console.error(`キャンセル試行 ${attempt}/${maxRetries}:`, error);
+          
+          if (attempt >= maxRetries) {
+            alert('キャンセルに失敗しました。もう一度お試しください。\n' + error.message);
+            return;
+          }
+          
+          // リトライ前に少し待つ
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt));
         }
-        
-        alert('予約をキャンセルしました');
-        
-        // 診察券を再読み込み
-        await loadCards();
-        
-      } catch (error) {
-        console.error('キャンセルエラー:', error);
-        alert('キャンセルに失敗しました: ' + error.message);
       }
     }
   </script>
