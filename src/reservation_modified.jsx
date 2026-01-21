@@ -16,7 +16,7 @@ import {
 import { customerDatabase } from './customerDatabase';
 import React, { useState } from 'react';
 import { db } from './firebaseConfig';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, orderBy, limit } from 'firebase/firestore';
 
 export default function ReservationSheet() {
   // ひらがな→カタカナ変換
@@ -48,7 +48,7 @@ export default function ReservationSheet() {
     const dayOfWeek = date.getDay(); // 0=日曜, 6=土曜
     
     if (dayOfWeek === 0) {
-      // 日曜日（8:30-16:45）
+      // 日曜日（8:30-16:00）
       return [
         { time: '8:30', cols: 11 },
         { time: '9:15', cols: 11 },
@@ -60,11 +60,10 @@ export default function ReservationSheet() {
         { time: '13:45', cols: 11 },
         { time: '14:30', cols: 11 },
         { time: '15:15', cols: 11 },
-        { time: '16:00', cols: 11 },
-        { time: '16:45', cols: 5 },
+        { time: '16:00', cols: 5 },
       ];
     } else if (dayOfWeek === 6) {
-      // 土曜日（9:00-19:15）
+      // 土曜日（9:00-18:30）
       return [
         { time: '9:00', cols: 11 },
         { time: '9:45', cols: 11 },
@@ -77,8 +76,7 @@ export default function ReservationSheet() {
         { time: '16:30', cols: 11 },
         { time: '17:15', cols: 11 },
         { time: '18:00', cols: 11 },
-        { time: '18:30', cols: 11 },
-        { time: '19:15', cols: 5 },
+        { time: '18:30', cols: 5 },
       ];
     } else {
       // 平日（9:00-19:30）
@@ -96,7 +94,6 @@ export default function ReservationSheet() {
         { time: '18:00', cols: 11 },
         { time: '18:45', cols: 11 },
         { time: '19:30', cols: 11 },
-        { time: '20:15', cols: 5 },
       ];
     }
   };
@@ -239,6 +236,39 @@ export default function ReservationSheet() {
 
   const getCellKey = (time, col, field) => `${time}-${col}-${field}`;
   
+  
+  // 診察券自動更新関数
+  const updateVisitCard = (customerId, date, time) => {
+    if (!customerId || !date || !time) return;
+    
+    setCustomerDb(prev => {
+      const customer = prev[customerId];
+      if (!customer) return prev;
+      
+      const visitCard = customer.visitCard || { startIndex: 0, visits: [] };
+      const visits = visitCard.visits || [];
+      
+      // 重複チェック
+      const exists = visits.some(v => v.date === date && v.time === time);
+      if (exists) return prev; // 既に登録済み
+      
+      const updatedDb = {
+        ...prev,
+        [customerId]: {
+          ...customer,
+          visitCard: {
+            ...visitCard,
+            visits: [...visits, { date, time }]
+          }
+        }
+      };
+      
+      saveCustomerDatabaseToServer(updatedDb);
+      console.log(`✅ 診察券に追加: ID ${customerId}, ${date} ${time}`);
+      
+      return updatedDb;
+    });
+  };
   // 施術メニューの選択肢
   const treatmentMenuOptions = [
     '骨楽', '60骨楽', '骨', '60骨', '楽', '60楽', '産後', '初診自費', '再診自費', 
@@ -425,6 +455,25 @@ export default function ReservationSheet() {
                 }
                 
                 console.log(`📝 ネット予約追加: ${booking.date} ${booking.time} ${booking.name}${booking.isNewPatient ? '【新規】' : ''}`);
+                
+                // 診察券に追加
+                if (booking.id && booking.date && booking.time) {
+                  const visitCard = currentCustomerDb[booking.id]?.visitCard || { startIndex: 0, visits: [] };
+                  const visits = visitCard.visits || [];
+                  
+                  // 重複チェック
+                  const exists = visits.some(v => v.date === booking.date && v.time === booking.time);
+                  if (!exists) {
+                    currentCustomerDb[booking.id] = {
+                      ...currentCustomerDb[booking.id],
+                      visitCard: {
+                        ...visitCard,
+                        visits: [...visits, { date: booking.date, time: booking.time }]
+                      }
+                    };
+                    console.log(`🎫 診察券に追加（ネット予約）: ID ${booking.id}, ${booking.date} ${booking.time}`);
+                  }
+                }
               });
               
               console.log('🔍 DEBUG: 全予約処理完了。更新後のデータ日数:', Object.keys(newData).length);
@@ -432,8 +481,10 @@ export default function ReservationSheet() {
               return newData;
               });
               
-              // customerDbは変更しないのでそのまま返す
-              return currentCustomerDb;
+              // customerDbを保存
+              setCustomerDb(currentCustomerDb);
+              saveCustomerDatabaseToServer(currentCustomerDb);
+              console.log('💾 顧客データ（診察券含む）を保存しました');
             });
             
             console.log('✅ ネット予約を予約表に反映しました');
@@ -480,6 +531,75 @@ export default function ReservationSheet() {
           console.warn('💡 CSVファイルをアップロードしてください');
           // 空でも設定（状態を明確にする）
           setStaffHolidays({});
+        }
+        
+        // キャンセル履歴読み込み
+        try {
+          console.log('📋 キャンセル履歴読み込み開始');
+          const cancellationsRef = collection(db, 'cancellations');
+          const q = query(cancellationsRef, orderBy('cancelledAt', 'desc'), limit(100));
+          const cancellationsSnapshot = await getDocs(q);
+          
+          const cancellations = [];
+          cancellationsSnapshot.forEach(docSnap => {
+            const docData = docSnap.data();
+            const cancelledAt = docData.cancelledAt?.toDate ? 
+              docData.cancelledAt.toDate().toLocaleString('ja-JP') : 
+              '不明';
+            
+            cancellations.push({
+              id: docData.customerId || '不明',
+              name: docData.customerName || '不明',
+              reason: `${docData.reservationDate} ${docData.reservationTime}の予約（患者キャンセル）`,
+              timestamp: cancelledAt
+            });
+          });
+          
+          if (cancellations.length > 0) {
+            console.log('✅ キャンセル履歴読み込み完了:', cancellations.length, '件');
+            
+            setAllDataByDate(prev => {
+              const newData = { ...prev };
+              
+              cancellations.forEach(cancel => {
+                const match = cancel.reason.match(/(\d{4}-\d{2}-\d{2})/);
+                if (match) {
+                  const dateKey = match[1];
+                  if (!newData[dateKey]) {
+                    newData[dateKey] = {
+                      data: {},
+                      duplicates: {},
+                      idDuplicates: {},
+                      newPatients: {},
+                      repeatPatients: {},
+                      rakuPatients: {},
+                      oralButtons: {},
+                      partialButtons: {},
+                      completedStatus: {},
+                      cancelHistory: [],
+                      memoTexts: {},
+                      reviewData: {},
+                      treatmentMenus: {}
+                    };
+                  }
+                  
+                  const exists = newData[dateKey].cancelHistory.some(
+                    existing => existing.timestamp === cancel.timestamp
+                  );
+                  
+                  if (!exists) {
+                    newData[dateKey].cancelHistory.push(cancel);
+                  }
+                }
+              });
+              
+              return newData;
+            });
+          } else {
+            console.log('📋 キャンセル履歴は空です');
+          }
+        } catch (error) {
+          console.error('❌ キャンセル履歴読み込みエラー:', error);
         }
         
         console.log('✅ 初期化完了');
@@ -1192,6 +1312,14 @@ export default function ReservationSheet() {
         }
       };
     });
+    
+    // 診察券に自動追加
+    if (value && inputName) {
+      console.log(`🔍 診察券追加開始: ID=${value}, date=${dateKey}, time=${time}`);
+      updateVisitCard(value, dateKey, time);
+    } else {
+      console.log(`⚠️ 診察券追加スキップ: value=${value}, inputName=${inputName}`);
+    }
     
     // 楽の状態を復元（顧客データベースに保存されている場合のみ）
     if (isRaku) {
@@ -2425,6 +2553,44 @@ export default function ReservationSheet() {
       
       return updatedData;
     });
+    
+    // 診察券からも削除
+    if (canceledId) {
+      console.log(`🔍 診察券削除開始: ID=${canceledId}, date=${dateKey}, time=${time}`);
+      setCustomerDb(prev => {
+        const customer = prev[canceledId];
+        if (!customer) {
+          console.log(`⚠️ 顧客が見つかりません: ID=${canceledId}`);
+          return prev;
+        }
+        
+        const visitCard = customer.visitCard || { startIndex: 0, visits: [] };
+        console.log(`🔍 削除前のvisits:`, visitCard.visits);
+        
+        const updatedVisits = visitCard.visits.filter(v => 
+          !(v.date === dateKey && v.time === time)
+        );
+        console.log(`🔍 削除後のvisits:`, updatedVisits);
+        
+        const updatedDb = {
+          ...prev,
+          [canceledId]: {
+            ...customer,
+            visitCard: {
+              ...visitCard,
+              visits: updatedVisits
+            }
+          }
+        };
+        
+        saveCustomerDatabaseToServer(updatedDb);
+        console.log(`✅ 診察券から削除完了: ID ${canceledId}, ${dateKey} ${time}`);
+        
+        return updatedDb;
+      });
+    } else {
+      console.log(`⚠️ canceledIdが空です`);
+    }
     
     setOpenDropdown(null);
     
@@ -4105,6 +4271,379 @@ export default function ReservationSheet() {
                                         </>
                                       );
                                     })()}
+                                  </div>
+                                );
+                              })()}
+                              
+                              {/* 診察券管理（24マス形式） */}
+                              {(() => {
+                                const idKey = getCellKey(time, col, 'id');
+                                const currentId = data[idKey]?.id;
+                                if (!currentId) return null;
+                                
+                                const visitCard = customerDb[currentId]?.visitCard || { startIndex: 0, visits: [] };
+                                const visits = visitCard.visits || [];
+                                const startIndex = visitCard.startIndex || 0;
+                                
+                                // 日付でソート
+                                const sortedVisits = [...visits].sort((a, b) => {
+                                  if (a.date !== b.date) return a.date.localeCompare(b.date);
+                                  return a.time.localeCompare(b.time);
+                                });
+                                
+                                // 24マスに配置
+                                const cells = Array(24).fill(null).map((_, index) => {
+                                  const visitIndex = index - startIndex;
+                                  if (visitIndex >= 0 && visitIndex < sortedVisits.length) {
+                                    return sortedVisits[visitIndex];
+                                  }
+                                  return null;
+                                });
+                                
+                                return (
+                                  <div style={{
+                                    padding: '6px',
+                                    marginBottom: '6px',
+                                    backgroundColor: '#E8F5E9',
+                                    borderRadius: '4px',
+                                    border: '1px solid #4CAF50',
+                                  }}>
+                                    <div style={{
+                                      fontSize: '10px',
+                                      color: '#2E7D32',
+                                      marginBottom: '4px',
+                                      fontWeight: 'bold',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center'
+                                    }}>
+                                      <span>🎫 診察券（開始: {startIndex + 1}番目 / 現在: {visits.length}回）</span>
+                                    </div>
+                                    
+                                    {/* 開始位置設定 */}
+                                    <div style={{ marginBottom: '6px', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '9px', color: '#555' }}>開始位置:</span>
+                                      <select
+                                        value={startIndex}
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          const newStartIndex = parseInt(e.target.value);
+                                          setCustomerDb(prev => {
+                                            const updatedDb = {
+                                              ...prev,
+                                              [currentId]: {
+                                                ...prev[currentId],
+                                                visitCard: {
+                                                  ...visitCard,
+                                                  startIndex: newStartIndex
+                                                }
+                                              }
+                                            };
+                                            saveCustomerDatabaseToServer(updatedDb);
+                                            return updatedDb;
+                                          });
+                                        }}
+                                        style={{
+                                          padding: '2px 4px',
+                                          fontSize: '9px',
+                                          borderRadius: '3px',
+                                          border: '1px solid #4CAF50',
+                                          backgroundColor: 'white'
+                                        }}
+                                      >
+                                        {[...Array(24)].map((_, i) => (
+                                          <option key={i} value={i}>{i + 1}番目</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    
+                                    {/* 24マスグリッド */}
+                                    <div style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'repeat(6, 1fr)',
+                                      gridTemplateRows: 'repeat(4, 1fr)',
+                                      gap: '1px',
+                                      backgroundColor: '#ddd',
+                                      border: '1px solid #4CAF50',
+                                      borderRadius: '3px',
+                                      overflow: 'hidden',
+                                      marginBottom: '6px'
+                                    }}>
+                                      {cells.map((visit, index) => {
+                                        if (visit) {
+                                          const [y, m, d] = visit.date.split('-');
+                                          return (
+                                            <div
+                                              key={index}
+                                              style={{
+                                                backgroundColor: '#C8E6C9',
+                                                padding: '4px 2px',
+                                                textAlign: 'center',
+                                                fontSize: '8px',
+                                                color: '#2E7D32',
+                                                fontWeight: 'bold',
+                                                position: 'relative',
+                                                cursor: 'pointer'
+                                              }}
+                                              title={`${visit.date} ${visit.time}`}
+                                            >
+                                              <div style={{ fontSize: '9px' }}>{index + 1}</div>
+                                              <div style={{ fontSize: '7px', marginTop: '2px' }}>{parseInt(m)}/{parseInt(d)}</div>
+                                              <div style={{ fontSize: '7px' }}>{visit.time}</div>
+                                            </div>
+                                          );
+                                        } else if (index < startIndex) {
+                                          return (
+                                            <div
+                                              key={index}
+                                              style={{
+                                                backgroundColor: '#f5f5f5',
+                                                padding: '4px 2px',
+                                                textAlign: 'center',
+                                                fontSize: '9px',
+                                                color: '#ccc'
+                                              }}
+                                            >
+                                              -
+                                            </div>
+                                          );
+                                        } else {
+                                          return (
+                                            <div
+                                              key={index}
+                                              style={{
+                                                backgroundColor: 'white',
+                                                padding: '4px 2px',
+                                                textAlign: 'center',
+                                                fontSize: '9px',
+                                                color: '#999'
+                                              }}
+                                            >
+                                              {index + 1}
+                                            </div>
+                                          );
+                                        }
+                                      })}
+                                    </div>
+                                    
+                                    {/* 手動追加と削除 */}
+                                    <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                                      <select
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
+                                        id={`visitcard-date-${currentId}`}
+                                        style={{
+                                          flex: 1,
+                                          padding: '2px 4px',
+                                          fontSize: '9px',
+                                          borderRadius: '3px',
+                                          border: '1px solid #4CAF50',
+                                          backgroundColor: 'white'
+                                        }}
+                                      >
+                                        <option value="">日付を選択</option>
+                                        {(() => {
+                                          const dates = [];
+                                          const today = new Date();
+                                          const startDate = new Date(today);
+                                          startDate.setDate(today.getDate() - 30); // 1ヶ月前
+                                          const endDate = new Date(today);
+                                          endDate.setDate(today.getDate() + 90); // 3ヶ月後
+                                          
+                                          for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                                            const dateStr = d.toISOString().split('T')[0];
+                                            const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+                                            const dayName = dayNames[d.getDay()];
+                                            const [y, m, day] = dateStr.split('-');
+                                            dates.push(
+                                              <option key={dateStr} value={dateStr}>
+                                                {parseInt(m)}月{parseInt(day)}日({dayName})
+                                              </option>
+                                            );
+                                          }
+                                          return dates;
+                                        })()}
+                                      </select>
+                                      
+                                      <select
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => e.stopPropagation()}
+                                        id={`visitcard-time-${currentId}`}
+                                        style={{
+                                          width: '90px',
+                                          padding: '2px 4px',
+                                          fontSize: '9px',
+                                          borderRadius: '3px',
+                                          border: '1px solid #4CAF50',
+                                          backgroundColor: 'white'
+                                        }}
+                                      >
+                                        <option value="">時間選択</option>
+                                        <optgroup label="🌙 平日">
+                                          <option value="9:00">9:00</option>
+                                          <option value="9:45">9:45</option>
+                                          <option value="10:30">10:30</option>
+                                          <option value="11:15">11:15</option>
+                                          <option value="11:45">11:45</option>
+                                          <option value="12:30">12:30</option>
+                                          <option value="15:00">15:00</option>
+                                          <option value="15:45">15:45</option>
+                                          <option value="16:30">16:30</option>
+                                          <option value="17:15">17:15</option>
+                                          <option value="18:00">18:00</option>
+                                          <option value="18:45">18:45</option>
+                                          <option value="19:30">19:30</option>
+                                        </optgroup>
+                                        <optgroup label="🌤️ 土曜">
+                                          <option value="9:00">9:00</option>
+                                          <option value="9:45">9:45</option>
+                                          <option value="10:30">10:30</option>
+                                          <option value="11:15">11:15</option>
+                                          <option value="11:45">11:45</option>
+                                          <option value="12:30">12:30</option>
+                                          <option value="15:00">15:00</option>
+                                          <option value="15:45">15:45</option>
+                                          <option value="16:30">16:30</option>
+                                          <option value="17:15">17:15</option>
+                                          <option value="18:00">18:00</option>
+                                          <option value="18:30">18:30</option>
+                                        </optgroup>
+                                        <optgroup label="☀️ 日曜">
+                                          <option value="8:30">8:30</option>
+                                          <option value="9:15">9:15</option>
+                                          <option value="10:00">10:00</option>
+                                          <option value="10:45">10:45</option>
+                                          <option value="11:30">11:30</option>
+                                          <option value="12:15">12:15</option>
+                                          <option value="13:00">13:00</option>
+                                          <option value="13:45">13:45</option>
+                                          <option value="14:30">14:30</option>
+                                          <option value="15:15">15:15</option>
+                                          <option value="16:00">16:00</option>
+                                        </optgroup>
+                                      </select>
+                                      
+                                      <button
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const dateSelect = document.getElementById(`visitcard-date-${currentId}`);
+                                          const timeSelect = document.getElementById(`visitcard-time-${currentId}`);
+                                          const date = dateSelect.value;
+                                          const time = timeSelect.value;
+                                          
+                                          if (!date || !time) {
+                                            alert('日付と時間を選択してください');
+                                            return;
+                                          }
+                                          
+                                          // 重複チェック
+                                          const exists = visits.some(v => v.date === date && v.time === time);
+                                          if (exists) {
+                                            alert('この日時は既に登録されています');
+                                            return;
+                                          }
+                                          
+                                          setCustomerDb(prev => {
+                                            const updatedDb = {
+                                              ...prev,
+                                              [currentId]: {
+                                                ...prev[currentId],
+                                                visitCard: {
+                                                  ...visitCard,
+                                                  visits: [...visits, { date, time }]
+                                                }
+                                              }
+                                            };
+                                            saveCustomerDatabaseToServer(updatedDb);
+                                            return updatedDb;
+                                          });
+                                          
+                                          // 選択をリセット
+                                          dateSelect.value = '';
+                                          timeSelect.value = '';
+                                        }}
+                                        style={{
+                                          padding: '2px 8px',
+                                          backgroundColor: '#4CAF50',
+                                          color: 'white',
+                                          border: 'none',
+                                          borderRadius: '3px',
+                                          fontSize: '9px',
+                                          cursor: 'pointer',
+                                          fontWeight: 'bold'
+                                        }}
+                                      >
+                                        追加
+                                      </button>
+                                    </div>
+                                    
+                                    {/* 最新5件の履歴リスト */}
+                                    {sortedVisits.length > 0 && (
+                                      <div style={{
+                                        fontSize: '8px',
+                                        color: '#555',
+                                        backgroundColor: 'white',
+                                        borderRadius: '3px',
+                                        padding: '4px',
+                                        maxHeight: '80px',
+                                        overflowY: 'auto'
+                                      }}>
+                                        {sortedVisits.slice(-5).reverse().map((visit, idx) => {
+                                          const actualIndex = sortedVisits.length - idx - 1;
+                                          return (
+                                            <div
+                                              key={idx}
+                                              style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: '2px',
+                                                borderBottom: idx < 4 ? '1px solid #eee' : 'none'
+                                              }}
+                                            >
+                                              <span>{startIndex + actualIndex + 1}. {visit.date} {visit.time}</span>
+                                              <button
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  if (window.confirm(`${visit.date} ${visit.time}を削除？`)) {
+                                                    setCustomerDb(prev => {
+                                                      const updatedVisits = visits.filter((_, i) => i !== actualIndex);
+                                                      const updatedDb = {
+                                                        ...prev,
+                                                        [currentId]: {
+                                                          ...prev[currentId],
+                                                          visitCard: {
+                                                            ...visitCard,
+                                                            visits: updatedVisits
+                                                          }
+                                                        }
+                                                      };
+                                                      saveCustomerDatabaseToServer(updatedDb);
+                                                      return updatedDb;
+                                                    });
+                                                  }
+                                                }}
+                                                style={{
+                                                  padding: '1px 4px',
+                                                  backgroundColor: '#F44336',
+                                                  color: 'white',
+                                                  border: 'none',
+                                                  borderRadius: '2px',
+                                                  fontSize: '7px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                削除
+                                              </button>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })()}
