@@ -2730,34 +2730,35 @@ export default function ReservationSheet() {
               {/* メニュー項目 */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <button
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     try {
                       // ボタンを無効化して連続クリックを防止
                       e.target.disabled = true;
                       e.target.style.backgroundColor = '#FF6B00';
-                      e.target.innerHTML = '<span style="font-size:20px">⏳</span> <span>データ準備中...</span>';
+                      e.target.innerHTML = '<span style="font-size:20px">⏳</span> <span>最新データ取得中...</span>';
                       
-                      console.log('データ保存開始...');
-                      console.log('allDataByDate:', Object.keys(allDataByDate).length, '件');
-                      console.log('customerDb:', Object.keys(customerDb).length, '件');
+                      console.log('🔄 Firestoreから最新データを取得中...');
                       
-                      // データを保存
+                      // Firestoreから最新の顧客データを取得
+                      const latestCustomerDb = await loadCustomerDatabaseFromServer();
+                      console.log('✅ 最新customerDb取得:', Object.keys(latestCustomerDb).length, '件');
+                      
+                      // localStorageに保存
+                      console.log('💾 localStorageに保存中...');
                       localStorage.setItem('allDataByDate', JSON.stringify(allDataByDate));
-                      localStorage.setItem('customerDb', JSON.stringify(customerDb));
+                      localStorage.setItem('customerDb', JSON.stringify(latestCustomerDb));
                       
-                      console.log('データ保存完了');
+                      console.log('✅ データ保存完了');
                       console.log('📍 遷移先URL:', './ticket_search.html');
-                      console.log('📍 現在のURL:', window.location.href);
                       
                       // 少し遅延を入れてボタンの変化を確認できるようにする
                       setTimeout(() => {
                         console.log('⏳ ページ遷移を実行...');
                         window.location.href = './ticket_search.html';
-                        console.log('✅ ページ遷移コマンド実行完了（このログの後にページが切り替わります）');
                       }, 300);
                       
                     } catch (error) {
-                      console.error('エラー詳細:', error);
+                      console.error('❌ エラー詳細:', error);
                       alert('エラーが発生しました:\n' + error.message);
                       e.target.disabled = false;
                       e.target.style.backgroundColor = '#FF9800';
@@ -3896,6 +3897,8 @@ export default function ReservationSheet() {
                                                       }
                                                     };
                                                     
+                                                    // タイムスタンプを更新してリアルタイム更新をブロック
+                                                    lastSaveTimestamp.current = Date.now();
                                                     saveCustomerDatabaseToServer(updatedDb);
                                                     console.log(`🎫 ID「${currentId}」に${name}の${count}回回数券を追加`);
                                                     return updatedDb;
@@ -3966,6 +3969,8 @@ export default function ReservationSheet() {
                                                         }
                                                       };
                                                       
+                                                      // タイムスタンプを更新してリアルタイム更新をブロック
+                                                      lastSaveTimestamp.current = Date.now();
                                                       saveCustomerDatabaseToServer(updatedDb);
                                                       console.log(`🎫 ID「${currentId}」に${name}の${count}回回数券を追加`);
                                                       return updatedDb;
@@ -4034,7 +4039,10 @@ export default function ReservationSheet() {
                                                       }
                                                     };
                                                     
+                                                    // タイムスタンプを更新してリアルタイム更新をブロック
+                                                    lastSaveTimestamp.current = Date.now();
                                                     saveCustomerDatabaseToServer(updatedDb);
+                                                    console.log(`🗑️ 回数券削除: ID ${currentId}, ${ticket.name} ${ticket.count}回`);
                                                     
                                                     // アクティブインデックスを調整
                                                     if (activeTicketIndex >= newTickets.length && newTickets.length > 0) {
