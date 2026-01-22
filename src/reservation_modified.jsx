@@ -146,6 +146,7 @@ export default function ReservationSheet() {
   const [editingCancelIndex, setEditingCancelIndex] = useState(null);
   const [editingCancelData, setEditingCancelData] = useState(null);
   const [activeTicketIndexes, setActiveTicketIndexes] = useState({}); // 各顧客のアクティブな回数券インデックスを管理
+  const [activeVisitCardIndexes, setActiveVisitCardIndexes] = useState({}); // 各顧客のアクティブな診察券カードインデックスを管理
   const [ticketTypeSelections, setTicketTypeSelections] = useState({}); // 各顧客の回数券種類選択状態
   
   // 回数券データを顧客DBに保存する形式
@@ -4358,6 +4359,20 @@ export default function ReservationSheet() {
                                 const totalSlots = 24;
                                 const cardsNeeded = Math.ceil((startIndex + sortedVisits.length) / totalSlots) || 1;
                                 
+                                // アクティブなカードのインデックス（最後のカードをデフォルト）
+                                const activeCardIndex = activeVisitCardIndexes[currentId] ?? (cardsNeeded - 1);
+                                
+                                // アクティブカードの24マス分を作成
+                                const cardStartSlot = activeCardIndex * totalSlots;
+                                const cells = Array(totalSlots).fill(null).map((_, slotIndex) => {
+                                  const absoluteIndex = cardStartSlot + slotIndex;
+                                  const visitIndex = absoluteIndex - startIndex;
+                                  if (visitIndex >= 0 && visitIndex < sortedVisits.length) {
+                                    return sortedVisits[visitIndex];
+                                  }
+                                  return null;
+                                });
+                                
                                 return (
                                   <div style={{
                                     padding: '6px',
@@ -4375,12 +4390,45 @@ export default function ReservationSheet() {
                                       justifyContent: 'space-between',
                                       alignItems: 'center'
                                     }}>
-                                      <span>🎫 診察券 {cardsNeeded}枚（開始: {startIndex + 1}番目 / 現在: {visits.length}回）</span>
+                                      <span>🎫 診察券（開始: {startIndex + 1}番目 / 現在: {visits.length}回）</span>
                                     </div>
                                     
-                                    {/* 開始位置設定 */}
-                                    <div style={{ marginBottom: '6px', display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '9px', color: '#555' }}>開始位置:</span>
+                                    {/* タブと開始位置設定 */}
+                                    <div style={{ marginBottom: '6px', display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                      {/* タブ（複数枚ある場合のみ表示） */}
+                                      {cardsNeeded > 1 && (
+                                        <>
+                                          {[...Array(cardsNeeded)].map((_, cardNum) => (
+                                            <button
+                                              key={cardNum}
+                                              onMouseDown={(e) => e.stopPropagation()}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveVisitCardIndexes(prev => ({
+                                                  ...prev,
+                                                  [currentId]: cardNum
+                                                }));
+                                              }}
+                                              style={{
+                                                padding: '3px 8px',
+                                                backgroundColor: activeCardIndex === cardNum ? '#4CAF50' : '#E0E0E0',
+                                                color: activeCardIndex === cardNum ? 'white' : '#555',
+                                                border: 'none',
+                                                borderRadius: '3px',
+                                                fontSize: '9px',
+                                                cursor: 'pointer',
+                                                fontWeight: activeCardIndex === cardNum ? 'bold' : 'normal'
+                                              }}
+                                            >
+                                              {cardNum + 1}枚目
+                                            </button>
+                                          ))}
+                                          <span style={{ fontSize: '9px', color: '#999', margin: '0 4px' }}>|</span>
+                                        </>
+                                      )}
+                                      
+                                      {/* 開始位置設定 */}
+                                      <span style={{ fontSize: '9px', color: '#555' }}>開始:</span>
                                       <select
                                         value={startIndex}
                                         onMouseDown={(e) => e.stopPropagation()}
@@ -4417,45 +4465,18 @@ export default function ReservationSheet() {
                                       </select>
                                     </div>
                                     
-                                    {/* 複数枚の診察券を表示 */}
-                                    {[...Array(cardsNeeded)].map((_, cardNum) => {
-                                      const cardStartSlot = cardNum * totalSlots;
-                                      const cardEndSlot = (cardNum + 1) * totalSlots;
-                                      
-                                      // このカードの24マス分を作成
-                                      const cells = Array(totalSlots).fill(null).map((_, slotIndex) => {
-                                        const absoluteIndex = cardStartSlot + slotIndex;
-                                        const visitIndex = absoluteIndex - startIndex;
-                                        if (visitIndex >= 0 && visitIndex < sortedVisits.length) {
-                                          return sortedVisits[visitIndex];
-                                        }
-                                        return null;
-                                      });
-                                      
-                                      return (
-                                        <div key={cardNum} style={{ marginBottom: '6px' }}>
-                                          {cardsNeeded > 1 && (
-                                            <div style={{
-                                              fontSize: '9px',
-                                              color: '#2E7D32',
-                                              marginBottom: '2px',
-                                              fontWeight: 'bold'
-                                            }}>
-                                              {cardNum + 1}枚目
-                                            </div>
-                                          )}
-                                          
-                                          {/* 24マスグリッド */}
-                                          <div style={{
-                                            display: 'grid',
-                                            gridTemplateColumns: 'repeat(6, 1fr)',
-                                            gridTemplateRows: 'repeat(4, 1fr)',
-                                            gap: '1px',
-                                            backgroundColor: '#ddd',
-                                            border: '1px solid #4CAF50',
-                                            borderRadius: '3px',
-                                            overflow: 'hidden'
-                                          }}>
+                                    {/* 24マスグリッド */}
+                                    <div style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'repeat(6, 1fr)',
+                                      gridTemplateRows: 'repeat(4, 1fr)',
+                                      gap: '1px',
+                                      backgroundColor: '#ddd',
+                                      border: '1px solid #4CAF50',
+                                      borderRadius: '3px',
+                                      overflow: 'hidden',
+                                      marginBottom: '6px'
+                                    }}>
                                       {cells.map((visit, slotIndex) => {
                                         const absoluteIndex = cardStartSlot + slotIndex;
                                         
@@ -4514,10 +4535,7 @@ export default function ReservationSheet() {
                                         }
                                       })}
                                     </div>
-                                  </div>
-                                );
-                              })}
-                              
+                                    
                                     {/* 手動追加と削除 */}
                                     <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
                                       <select
