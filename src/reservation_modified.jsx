@@ -16,7 +16,7 @@ import {
 import { customerDatabase } from './customerDatabase';
 import React, { useState } from 'react';
 import { db } from './firebaseConfig';
-import { collection, query, where, getDocs, deleteDoc, doc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, deleteDoc, doc, orderBy, limit, getDoc, setDoc } from 'firebase/firestore';
 
 export default function ReservationSheet() {
   // ひらがな→カタカナ変換
@@ -3899,8 +3899,21 @@ export default function ReservationSheet() {
                                                     
                                                     // タイムスタンプを更新してリアルタイム更新をブロック
                                                     lastSaveTimestamp.current = Date.now();
+                                                    
+                                                    // 🔧 個別にFirestoreへ保存（高速）
+                                                    (async () => {
+                                                      try {
+                                                        const docRef = doc(db, 'customers', currentId);
+                                                        await setDoc(docRef, updatedDb[currentId], { merge: true });
+                                                        console.log(`🎫 回数券追加 & Firestore保存完了: ID ${currentId}, ${name} ${count}回`);
+                                                      } catch (error) {
+                                                        console.error('❌ Firestore保存エラー:', error);
+                                                      }
+                                                    })();
+                                                    
+                                                    // 全体保存（バックグラウンドで実行）
                                                     saveCustomerDatabaseToServer(updatedDb);
-                                                    console.log(`🎫 ID「${currentId}」に${name}の${count}回回数券を追加`);
+                                                    
                                                     return updatedDb;
                                                   });
                                                   
@@ -3971,8 +3984,21 @@ export default function ReservationSheet() {
                                                       
                                                       // タイムスタンプを更新してリアルタイム更新をブロック
                                                       lastSaveTimestamp.current = Date.now();
+                                                      
+                                                      // 🔧 個別にFirestoreへ保存（高速）
+                                                      (async () => {
+                                                        try {
+                                                          const docRef = doc(db, 'customers', currentId);
+                                                          await setDoc(docRef, updatedDb[currentId], { merge: true });
+                                                          console.log(`🎫 回数券追加 & Firestore保存完了: ID ${currentId}, ${name} ${count}回`);
+                                                        } catch (error) {
+                                                          console.error('❌ Firestore保存エラー:', error);
+                                                        }
+                                                      })();
+                                                      
+                                                      // 全体保存（バックグラウンドで実行）
                                                       saveCustomerDatabaseToServer(updatedDb);
-                                                      console.log(`🎫 ID「${currentId}」に${name}の${count}回回数券を追加`);
+                                                      
                                                       return updatedDb;
                                                     });
                                                     
@@ -4041,8 +4067,37 @@ export default function ReservationSheet() {
                                                     
                                                     // タイムスタンプを更新してリアルタイム更新をブロック
                                                     lastSaveTimestamp.current = Date.now();
+                                                    
+                                                    // 🔧 個別にFirestoreへ保存（高速）
+                                                    (async () => {
+                                                      try {
+                                                        const docRef = doc(db, 'customers', currentId);
+                                                        await setDoc(docRef, updatedDb[currentId], { merge: true });
+                                                        console.log(`🗑️ 回数券削除 & Firestore保存完了: ID ${currentId}, ${ticket.name} ${ticket.count}回`);
+                                                        
+                                                        // 確認
+                                                        setTimeout(async () => {
+                                                          const docSnap = await getDoc(docRef);
+                                                          if (docSnap.exists()) {
+                                                            const firestoreTickets = docSnap.data().tickets || [];
+                                                            console.log('🔍 Firestore確認: ID', currentId, 'tickets:', firestoreTickets.length, '件');
+                                                            if (firestoreTickets.length !== newTickets.length) {
+                                                              console.error('❌ まだ不一致！', {
+                                                                local: newTickets.length,
+                                                                firestore: firestoreTickets.length
+                                                              });
+                                                            } else {
+                                                              console.log('✅ 削除が確実に反映されました');
+                                                            }
+                                                          }
+                                                        }, 500);
+                                                      } catch (error) {
+                                                        console.error('❌ Firestore保存エラー:', error);
+                                                      }
+                                                    })();
+                                                    
+                                                    // 全体保存（バックグラウンドで実行）
                                                     saveCustomerDatabaseToServer(updatedDb);
-                                                    console.log(`🗑️ 回数券削除: ID ${currentId}, ${ticket.name} ${ticket.count}回`);
                                                     
                                                     // アクティブインデックスを調整
                                                     if (activeTicketIndex >= newTickets.length && newTickets.length > 0) {
@@ -4299,14 +4354,9 @@ export default function ReservationSheet() {
                                   return a.time.localeCompare(b.time);
                                 });
                                 
-                                // 24マスに配置
-                                const cells = Array(24).fill(null).map((_, index) => {
-                                  const visitIndex = index - startIndex;
-                                  if (visitIndex >= 0 && visitIndex < sortedVisits.length) {
-                                    return sortedVisits[visitIndex];
-                                  }
-                                  return null;
-                                });
+                                // 必要な枚数を計算
+                                const totalSlots = 24;
+                                const cardsNeeded = Math.ceil((startIndex + sortedVisits.length) / totalSlots) || 1;
                                 
                                 return (
                                   <div style={{
@@ -4325,7 +4375,7 @@ export default function ReservationSheet() {
                                       justifyContent: 'space-between',
                                       alignItems: 'center'
                                     }}>
-                                      <span>🎫 診察券（開始: {startIndex + 1}番目 / 現在: {visits.length}回）</span>
+                                      <span>🎫 診察券 {cardsNeeded}枚（開始: {startIndex + 1}番目 / 現在: {visits.length}回）</span>
                                     </div>
                                     
                                     {/* 開始位置設定 */}
@@ -4367,24 +4417,53 @@ export default function ReservationSheet() {
                                       </select>
                                     </div>
                                     
-                                    {/* 24マスグリッド */}
-                                    <div style={{
-                                      display: 'grid',
-                                      gridTemplateColumns: 'repeat(6, 1fr)',
-                                      gridTemplateRows: 'repeat(4, 1fr)',
-                                      gap: '1px',
-                                      backgroundColor: '#ddd',
-                                      border: '1px solid #4CAF50',
-                                      borderRadius: '3px',
-                                      overflow: 'hidden',
-                                      marginBottom: '6px'
-                                    }}>
-                                      {cells.map((visit, index) => {
+                                    {/* 複数枚の診察券を表示 */}
+                                    {[...Array(cardsNeeded)].map((_, cardNum) => {
+                                      const cardStartSlot = cardNum * totalSlots;
+                                      const cardEndSlot = (cardNum + 1) * totalSlots;
+                                      
+                                      // このカードの24マス分を作成
+                                      const cells = Array(totalSlots).fill(null).map((_, slotIndex) => {
+                                        const absoluteIndex = cardStartSlot + slotIndex;
+                                        const visitIndex = absoluteIndex - startIndex;
+                                        if (visitIndex >= 0 && visitIndex < sortedVisits.length) {
+                                          return sortedVisits[visitIndex];
+                                        }
+                                        return null;
+                                      });
+                                      
+                                      return (
+                                        <div key={cardNum} style={{ marginBottom: '6px' }}>
+                                          {cardsNeeded > 1 && (
+                                            <div style={{
+                                              fontSize: '9px',
+                                              color: '#2E7D32',
+                                              marginBottom: '2px',
+                                              fontWeight: 'bold'
+                                            }}>
+                                              {cardNum + 1}枚目
+                                            </div>
+                                          )}
+                                          
+                                          {/* 24マスグリッド */}
+                                          <div style={{
+                                            display: 'grid',
+                                            gridTemplateColumns: 'repeat(6, 1fr)',
+                                            gridTemplateRows: 'repeat(4, 1fr)',
+                                            gap: '1px',
+                                            backgroundColor: '#ddd',
+                                            border: '1px solid #4CAF50',
+                                            borderRadius: '3px',
+                                            overflow: 'hidden'
+                                          }}>
+                                      {cells.map((visit, slotIndex) => {
+                                        const absoluteIndex = cardStartSlot + slotIndex;
+                                        
                                         if (visit) {
                                           const [y, m, d] = visit.date.split('-');
                                           return (
                                             <div
-                                              key={index}
+                                              key={slotIndex}
                                               style={{
                                                 backgroundColor: '#C8E6C9',
                                                 padding: '4px 2px',
@@ -4397,15 +4476,15 @@ export default function ReservationSheet() {
                                               }}
                                               title={`${visit.date} ${visit.time}`}
                                             >
-                                              <div style={{ fontSize: '9px' }}>{index + 1}</div>
+                                              <div style={{ fontSize: '9px' }}>{absoluteIndex + 1}</div>
                                               <div style={{ fontSize: '7px', marginTop: '2px' }}>{parseInt(m)}/{parseInt(d)}</div>
                                               <div style={{ fontSize: '7px' }}>{visit.time}</div>
                                             </div>
                                           );
-                                        } else if (index < startIndex) {
+                                        } else if (absoluteIndex < startIndex) {
                                           return (
                                             <div
-                                              key={index}
+                                              key={slotIndex}
                                               style={{
                                                 backgroundColor: '#f5f5f5',
                                                 padding: '4px 2px',
@@ -4420,7 +4499,7 @@ export default function ReservationSheet() {
                                         } else {
                                           return (
                                             <div
-                                              key={index}
+                                              key={slotIndex}
                                               style={{
                                                 backgroundColor: 'white',
                                                 padding: '4px 2px',
@@ -4429,13 +4508,16 @@ export default function ReservationSheet() {
                                                 color: '#999'
                                               }}
                                             >
-                                              {index + 1}
+                                              {absoluteIndex + 1}
                                             </div>
                                           );
                                         }
                                       })}
                                     </div>
-                                    
+                                  </div>
+                                );
+                              })}
+                              
                                     {/* 手動追加と削除 */}
                                     <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
                                       <select
