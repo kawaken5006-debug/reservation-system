@@ -12,7 +12,7 @@
   <!-- Babel (JSX変換) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   
@@ -69,7 +69,7 @@
       border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
-      min-height: 44px; /* iOS推奨のタップ領域 */
+      min-height: 44px;
       touch-action: manipulation;
     }
 
@@ -188,7 +188,7 @@
       max-width: 600px;
       max-height: 90vh;
       overflow-y: auto;
-      -webkit-overflow-scrolling: touch; /* スムーズスクロール */
+      -webkit-overflow-scrolling: touch;
       padding: 30px;
       background: white;
       border-radius: 8px;
@@ -361,7 +361,7 @@
 
       .form-group input,
       .form-group select {
-        font-size: 16px; /* iOS zoom防止 */
+        font-size: 16px;
       }
 
       .button-group {
@@ -381,7 +381,6 @@
       }
     }
 
-    /* タブレット用（iPad等） */
     @media (min-width: 769px) and (max-width: 1024px) {
       .container {
         max-width: 100%;
@@ -404,7 +403,6 @@
       }
     }
 
-    /* 横向き対応 */
     @media (max-width: 768px) and (orientation: landscape) {
       .booking-form {
         max-height: 90vh;
@@ -427,21 +425,69 @@
   <!-- Firebase初期化 -->
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyBPkeSTfjPbs8HCyZBpfRJ29BlocCkq6BQ",
+      apiKey: "AIzaSyDNWom7ao2r37n76RaXpPo5vV0DnW-XLtw",
       authDomain: "rihacure.firebaseapp.com",
       projectId: "rihacure",
       storageBucket: "rihacure.firebasestorage.app",
-      messagingSenderId: "229599758408",
-      appId: "1:229599758408:web:61fb08574bf90c8263f07d"
+      messagingSenderId: "862106618207",
+      appId: "1:862106618207:web:e68f31962e28d893c4d8a3"
     };
     
-    firebase.initializeApp(firebaseConfig);
+    // 二重初期化を防ぐ
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    
     const db = firebase.firestore();
+    
+    // オフライン永続化を無効化
+    db.disableNetwork().then(() => {
+      return db.enableNetwork();
+    }).catch((error) => {
+      console.error('Network error:', error);
+    });
+    
     console.log('✅ Firebase初期化完了');
   </script>
   
   <script type="text/babel">
-    // テストデータ
+    // ===== メール認証機能 =====
+    const EMAIL_API_URL = 'https://script.google.com/macros/s/AKfycbxeqlUuIsseTi2L5WmqMec41eWQXJ5z_jihteUa69-S3sKfVXgvw0wSiLaBdAfAozn6TQ/exec';
+
+    // トークン生成関数
+    function generateVerificationToken() {
+      return Math.random().toString(36).substring(2, 15) + 
+             Math.random().toString(36).substring(2, 15) + 
+             Date.now().toString(36);
+    }
+
+    // メール送信関数
+    async function sendVerificationEmail(email, customerId, token, name) {
+      try {
+        const response = await fetch(EMAIL_API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'send_verification',
+            email: email,
+            customerId: customerId,
+            token: token,
+            name: name
+          })
+        });
+        
+        console.log('✅ 認証メール送信完了:', email);
+        return true;
+      } catch (error) {
+        console.error('❌ メール送信エラー:', error);
+        return false;
+      }
+    }
+    // ===== メール認証機能ここまで =====
+    
     const BUSINESS_HOURS = {
       weekday: [
         '9:00', '9:45', '10:30', '11:15', '11:45',
@@ -465,8 +511,6 @@
       { id: 'facial', name: '美容鍼', duration: 45 }
     ];
 
-    // existingBookingsは各コンポーネント内で動的に読み込まれます
-
     const MAX_SLOTS = {
       '8:30': 11, '9:00': 11, '9:15': 11, '9:45': 11, '10:00': 11, '10:30': 11,
       '10:45': 11, '11:15': 11, '11:30': 11, '11:45': 11, '12:15': 11, '12:30': 5,
@@ -488,16 +532,77 @@
 
 
     const AvailabilityTable = () => {
+      // 🔐 マイページからの自動ログイン処理
+      React.useEffect(() => {
+        console.log('🔵 useEffect実行');
+        console.log('🔍 URL:', window.location.href);
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const customerId = urlParams.get('customerId');
+        const autoLogin = urlParams.get('autoLogin');
+        
+        console.log('🔍 customerId:', customerId);
+        console.log('🔍 autoLogin:', autoLogin);
+        
+        if (autoLogin === 'true' && customerId) {
+          console.log('🔐 マイページから自動ログイン: ID', customerId);
+          
+          (async () => {
+            try {
+              console.log('🔵 Firestoreから顧客データ取得開始:', customerId);
+              const customerDoc = await db.collection('customers').doc(customerId).get();
+              
+              console.log('🔍 customerDoc.exists:', customerDoc.exists);
+              console.log('🔍 customerDoc:', customerDoc);
+              
+              if (customerDoc.exists) {
+                const customer = customerDoc.data();
+                
+                console.log('🔍 customer:', customer);
+                
+                setFormData({
+                  customerId: customerId,
+                  password: '',
+                  name: customer.name,
+                  phone: customer.phone,
+                  email: customer.email || '',
+                  treatment: ''
+                });
+                
+                setLoginChoice('existing');
+                
+                console.log('✅ 自動ログイン完了:', customer.name);
+                console.log('💡 時間枠を選択してください');
+                
+                const cleanUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+              } else {
+                console.error('❌ 顧客が見つかりません:', customerId);
+              }
+            } catch (error) {
+              console.error('❌ 自動ログインエラー:', error);
+              console.error('❌ エラー詳細:', error.message);
+              console.error('❌ エラースタック:', error.stack);
+              console.error('❌ 顧客ID:', customerId);
+            }
+          })();
+        } else {
+          console.log('⚠️ 自動ログインの条件を満たしていません');
+          console.log('⚠️ autoLogin:', autoLogin);
+          console.log('⚠️ customerId:', customerId);
+        }
+      }, []);
+
       const [currentDate, setCurrentDate] = React.useState(new Date());
       const [selectedSlot, setSelectedSlot] = React.useState(null);
       const [showForm, setShowForm] = React.useState(false);
-      const [showLoginStep, setShowLoginStep] = React.useState(false); // ログインステップ表示
-      const [loginChoice, setLoginChoice] = React.useState(null); // 'existing', 'new', 'existing-no-id'
-      const [showLoginForm, setShowLoginForm] = React.useState(false); // ログインフォーム表示フラグ
-      const [showPasswordSetup, setShowPasswordSetup] = React.useState(false); // パスワード登録画面
-      const [passwordConfirm, setPasswordConfirm] = React.useState(''); // パスワード確認用
-      const [verificationMethod, setVerificationMethod] = React.useState('email'); // 'email' or 'sms'
-      const [verificationSent, setVerificationSent] = React.useState(false); // 認証URL送信済み
+      const [showLoginStep, setShowLoginStep] = React.useState(false);
+      const [loginChoice, setLoginChoice] = React.useState(null);
+      const [showLoginForm, setShowLoginForm] = React.useState(false);
+      const [showPasswordSetup, setShowPasswordSetup] = React.useState(false);
+      const [passwordConfirm, setPasswordConfirm] = React.useState('');
+      const [verificationMethod, setVerificationMethod] = React.useState('email');
+      const [verificationSent, setVerificationSent] = React.useState(false);
       const [existingBookings, setExistingBookings] = React.useState({});
       const [formData, setFormData] = React.useState({
         customerId: '',
@@ -508,20 +613,17 @@
         treatment: ''
       });
 
-      // 予約データを読み込み
       React.useEffect(() => {
         const loadBookings = async () => {
           try {
             console.log('🔵 予約データ読み込み開始');
             
-            // reservationsコレクションから既存予約を取得
             const reservationsSnapshot = await db.collection('reservations').get();
             const allReservations = {};
             reservationsSnapshot.forEach(doc => {
               allReservations[doc.id] = doc.data();
             });
             
-            // webBookingsコレクションから新規予約を取得
             const webBookingsSnapshot = await db.collection('webBookings').get();
             const webBookings = [];
             webBookingsSnapshot.forEach(doc => {
@@ -531,10 +633,8 @@
             console.log('📊 reservations件数:', reservationsSnapshot.size);
             console.log('📊 webBookings件数:', webBookingsSnapshot.size);
             
-            // 日付ごとに予約枠を集計
             const bookingsByDate = {};
             
-            // 1. reservationsから集計
             Object.keys(allReservations).forEach(dateKey => {
               const dateData = allReservations[dateKey];
               if (!dateData || !dateData.data) return;
@@ -542,12 +642,10 @@
               const bookings = [];
               const data = dateData.data;
               
-              // すべての予約枠をチェック
               Object.keys(data).forEach(key => {
                 if (key.endsWith('-name')) {
                   const nameValue = data[key]?.name;
                   if (nameValue && nameValue.trim() !== '') {
-                    // キーから時間と列を抽出: "9:45-0-name" -> time="9:45", col=0
                     const parts = key.split('-');
                     if (parts.length >= 3) {
                       const time = parts[0];
@@ -563,7 +661,6 @@
               }
             });
             
-            // 2. webBookingsから追加
             webBookings.forEach(booking => {
               const dateKey = booking.date;
               if (!bookingsByDate[dateKey]) {
@@ -627,13 +724,11 @@
         });
       };
 
-      // 平日・土曜時間
       const weekdayTimeSlots = [
         '9:00', '9:45', '10:30', '11:15', '11:45',
         '15:00', '15:45', '16:30', '17:15', '18:00', '18:30', '18:45', '19:30'
       ];
       
-      // 日曜専用時間
       const sundayTimeSlots = [
         '8:30', '9:15', '10:00', '10:45', '11:30', '12:15',
         '13:00', '13:45', '14:30', '15:15', '16:00'
@@ -647,15 +742,28 @@
         if (!available || date < today) return;
         
         setSelectedSlot({ date, time });
-        setShowLoginStep(true); // まずログインステップを表示
-        setLoginChoice(null);
-        setShowLoginForm(false);
-        setShowPasswordSetup(false);
-        setPasswordConfirm('');
-        setShowForm(false);
+        
+        console.log('🔍 handleSlotClick - formData:', formData);
+        console.log('🔍 handleSlotClick - customerId:', formData.customerId);
+        console.log('🔍 handleSlotClick - name:', formData.name);
+        
+        // 既にログイン済み（customerIdがある）なら直接予約フォームへ
+        if (formData.customerId && formData.name) {
+          console.log('✅ 既にログイン済み - 予約フォームを表示');
+          setShowLoginStep(false);
+          setShowForm(true);
+        } else {
+          console.log('⚠️ ログインしていない - ログインステップを表示');
+          // ログインしていない場合はログインステップを表示
+          setShowLoginStep(true);
+          setLoginChoice(null);
+          setShowLoginForm(false);
+          setShowPasswordSetup(false);
+          setPasswordConfirm('');
+          setShowForm(false);
+        }
       };
 
-      // ログイン処理
       const handleLogin = async (e) => {
         e.preventDefault();
         try {
@@ -667,17 +775,16 @@
           } else {
             const customer = customerDoc.data();
             if (customer.password === formData.password) {
-              result = { success: true, customer: { id: customerDoc.id, ...customer } }; // idを追加
+              result = { success: true, customer: { id: customerDoc.id, ...customer } };
             } else {
               result = { success: false, message: 'パスワードが一致しません' };
             }
           }
           
           if (result.success) {
-            // ログイン成功 - 情報自動入力
             setFormData(prev => ({
               ...prev,
-              customerId: result.customer.id, // ドキュメントIDを保持
+              customerId: result.customer.id,
               name: result.customer.name,
               phone: result.customer.phone,
               email: result.customer.email || ''
@@ -696,21 +803,30 @@
 
       const handleSubmit = async () => {
         console.log('🔵 handleSubmit開始');
-        console.log('🔍🔍🔍 formData.customerId:', formData.customerId); // 重要
+        console.log('🔍🔍🔍 formData.customerId:', formData.customerId);
         
-        // 電話番号またはメールアドレスのどちらかが必須
         if (!formData.name || (!formData.phone && !formData.email) || !formData.treatment) {
           alert('お名前、連絡先（電話番号またはメールアドレス）、施術内容を入力してください');
           return;
         }
 
-        // 予約データを作成
+        // メールアドレス必須チェック（メール認証のため）
+        if (!formData.email) {
+          alert('メール認証のため、メールアドレスの入力が必須です');
+          return;
+        }
+
         const selectedMenu = TREATMENT_MENUS.find(m => m.id === formData.treatment);
         
-        // デバッグログ追加
+        // 顧客IDとトークン生成
+        const customerId = formData.customerId || `WEB_${Date.now()}`;
+        const verificationToken = generateVerificationToken();
+        
         console.log('🔍 デバッグ開始 ================');
         console.log('🔍 formData:', formData);
         console.log('🔍 formData.customerId:', formData.customerId);
+        console.log('🔍 customerId:', customerId);
+        console.log('🔍 verificationToken:', verificationToken);
         console.log('🔍 formData.treatment:', formData.treatment);
         console.log('🔍 selectedMenu:', selectedMenu);
         console.log('🔍 selectedMenu?.isNewPatient:', selectedMenu?.isNewPatient);
@@ -726,7 +842,10 @@
           isNewPatient: selectedMenu?.isNewPatient || false,
           bookingDate: new Date().toISOString(),
           source: 'web',
-          id: formData.customerId || `WEB_${Date.now()}` // ログイン済みなら既存ID、そうでなければ新規ID
+          id: customerId,
+          emailVerified: false,
+          verificationToken: verificationToken,
+          verificationSentAt: new Date().toISOString()
         };
 
         console.log('🔍 bookingData:', bookingData);
@@ -735,7 +854,6 @@
         console.log('🔍 デバッグ終了 ================');
         console.log('✅ 予約確定:', bookingData);
 
-        // サーバーに送信
         try {
           console.log('🔵 Firestoreに送信開始');
           
@@ -744,14 +862,102 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           });
           
+          console.log('✅ webBookings保存完了');
+          
+          // 🎫 診察券への記録処理
+          if (formData.customerId && formData.customerId !== `WEB_${Date.now()}`) {
+            console.log('🎫 診察券への記録開始:', formData.customerId);
+            
+            try {
+              const customerRef = db.collection('customers').doc(formData.customerId);
+              const customerDoc = await customerRef.get();
+              
+              if (customerDoc.exists) {
+                const customerData = customerDoc.data();
+                const visitCard = customerData.visitCard || { startIndex: 0, visits: [] };
+                
+                console.log('🎫 現在の診察券:', visitCard);
+                
+                // 新しい来院記録を追加
+                const newVisit = {
+                  date: bookingData.date,
+                  time: bookingData.time,
+                  recordedAt: new Date().toISOString()
+                };
+                
+                visitCard.visits.push(newVisit);
+                
+                // Firestoreに保存
+                await customerRef.update({
+                  visitCard: visitCard
+                });
+                
+                console.log('✅ 診察券更新完了:', newVisit);
+              } else {
+                console.log('⚠️ 顧客が見つかりません:', formData.customerId);
+              }
+            } catch (visitCardError) {
+              console.error('❌ 診察券更新エラー:', visitCardError);
+              // 診察券の更新に失敗しても予約は完了しているので続行
+            }
+          } else {
+            console.log('⚠️ 顧客IDがないため診察券は更新しません');
+          }
+          
           const result = { success: true };
           console.log('✅ Firestore保存完了');
           
           if (result.success) {
             alert(`予約が完了しました！\n\n日時: ${bookingData.date} ${bookingData.time}\nお名前: ${bookingData.name}\n\n確認メールをお送りしました。`);
             
+            // メール認証送信
+            if (formData.email) {
+              console.log('📧 認証メール送信開始...');
+              const emailSent = await sendVerificationEmail(
+                formData.email,
+                customerId,
+                verificationToken,
+                formData.name
+              );
+              
+              if (emailSent) {
+                alert('認証メールを送信しました。メールをご確認ください。');
+              }
+            }
+            
+            // 顧客情報の保存・更新（新規・既存どちらでも）
+            try {
+              const customerRef = db.collection('customers').doc(customerId);
+              const customerDoc = await customerRef.get();
+              
+              if (customerDoc.exists()) {
+                // 既存顧客：トークン情報のみ更新
+                await customerRef.update({
+                  emailVerified: false,
+                  verificationToken: verificationToken,
+                  verificationSentAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('✅ 既存顧客のトークン情報を更新しました:', customerId);
+              } else {
+                // 新規顧客：全情報を保存
+                await customerRef.set({
+                  id: customerId,
+                  name: formData.name,
+                  phone: formData.phone || '',
+                  email: formData.email,
+                  emailVerified: false,
+                  verificationToken: verificationToken,
+                  verificationSentAt: firebase.firestore.FieldValue.serverTimestamp(),
+                  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                  source: 'web'
+                });
+                console.log('✅ 新規顧客情報を保存しました:', customerId);
+              }
+            } catch (error) {
+              console.error('❌ 顧客情報保存エラー:', error);
+            }
+            
             console.log('🔵 画面更新処理開始');
-            // 既存予約に追加（state更新）
             const dateStr = bookingData.date;
             setExistingBookings(prev => {
               const updated = { ...prev };
@@ -784,7 +990,11 @@
       const handleCancel = () => {
         setShowForm(false);
         setSelectedSlot(null);
-        setFormData({ name: '', phone: '', email: '', treatment: '' });
+        // ログイン情報（customerId, name, phone, email）は保持し、treatmentだけクリア
+        setFormData(prev => ({
+          ...prev,
+          treatment: ''
+        }));
       };
 
       const handlePrevWeek = () => {
@@ -823,7 +1033,6 @@
                     const weeks = [];
                     let currentWeek = [];
                     
-                    // 週ごとにグループ化
                     for (let i = 0; i < allDates.length; i++) {
                       const date = allDates[i];
                       const dayOfWeek = date.getDay();
@@ -955,7 +1164,6 @@
             </table>
           </div>
 
-          {/* ログインステップ */}
           {showLoginStep && selectedSlot && (
             <div className="booking-form active">
               <h2>📝 予約フォーム</h2>
@@ -965,7 +1173,6 @@
                 {formatDate(selectedSlot.date)} ({getDayOfWeek(selectedSlot.date)}) {selectedSlot.time}
               </div>
 
-              {/* Step 1: 既存 or 新規選択 */}
               {loginChoice === null && (
                 <div style={{marginTop: '20px'}}>
                   <h3 style={{marginBottom: '15px'}}>患者タイプを選択してください</h3>
@@ -990,7 +1197,6 @@
                 </div>
               )}
 
-              {/* Step 2: IDあり or なし */}
               {loginChoice === 'existing' && !showLoginForm && !showPasswordSetup && (
                 <div style={{marginTop: '20px'}}>
                   <h3 style={{marginBottom: '15px'}}>IDをお持ちですか？</h3>
@@ -1028,7 +1234,6 @@
                 </div>
               )}
 
-              {/* Step 3: ログインフォーム */}
               {showLoginForm && (
                 <form onSubmit={handleLogin} style={{marginTop: '20px'}}>
                   <h3 style={{marginBottom: '15px'}}>ログイン</h3>
@@ -1068,12 +1273,10 @@
                 </form>
               )}
 
-              {/* Step 3-2: パスワード登録フォーム */}
               {showPasswordSetup && (
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   
-                  // パスワード一致チェック
                   if (formData.password !== passwordConfirm) {
                     alert('パスワードが一致しません');
                     return;
@@ -1084,7 +1287,6 @@
                     return;
                   }
                   
-                  // 認証方法のバリデーション
                   if (verificationMethod === 'email' && !formData.email) {
                     alert('メールアドレスを入力してください');
                     return;
@@ -1099,7 +1301,6 @@
                     console.log('🔵 パスワード設定開始');
                     console.log('🔍 customerId:', formData.customerId);
                     
-                    // Firestoreの顧客ドキュメントを取得
                     const customerDoc = await db.collection('customers').doc(formData.customerId).get();
                     
                     if (!customerDoc.exists) {
@@ -1109,7 +1310,6 @@
                     
                     const customerData = customerDoc.data();
                     
-                    // パスワードと連絡先を更新
                     await db.collection('customers').doc(formData.customerId).update({
                       password: formData.password,
                       phone: verificationMethod === 'sms' ? formData.phone : (customerData.phone || ''),
@@ -1119,13 +1319,12 @@
                     
                     console.log('✅ Firestoreにパスワード保存完了');
                     
-                    // 更新後の顧客情報を取得してformDataに反映
                     const updatedDoc = await db.collection('customers').doc(formData.customerId).get();
                     const updatedCustomer = updatedDoc.data();
                     
                     setFormData(prev => ({
                       ...prev,
-                      customerId: formData.customerId, // 明示的にIDを保持
+                      customerId: formData.customerId,
                       name: updatedCustomer.name || prev.name,
                       phone: updatedCustomer.phone || prev.phone,
                       email: updatedCustomer.email || prev.email
@@ -1138,11 +1337,10 @@
                       email: updatedCustomer.email
                     });
                     
-                    // パスワード設定完了後、予約フォームへ移動
                     alert('パスワードを設定しました！予約を続けてください。');
                     setShowPasswordSetup(false);
                     setShowLoginStep(false);
-                    setShowForm(true); // 予約フォームを表示
+                    setShowForm(true);
                     
                   } catch (error) {
                     console.error('❌ パスワード設定エラー:', error);
@@ -1308,7 +1506,6 @@
                 </form>
               )}
 
-              {/* 全体キャンセルボタン（ログインフォーム以外で表示） */}
               {loginChoice === null && (
                 <button 
                   className="cancel-btn" 
@@ -1384,11 +1581,9 @@
                   <option value="">選択してください</option>
                   {TREATMENT_MENUS
                     .filter(menu => {
-                      // 初めての方は新規メニューのみ
                       if (loginChoice === 'new') {
                         return menu.isNewPatient === true;
                       }
-                      // 既存の方は既存メニューのみ
                       return menu.isNewPatient !== true;
                     })
                     .map(menu => (
